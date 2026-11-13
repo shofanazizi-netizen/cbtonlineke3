@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>CBT Sekolah</title>
+<link rel="manifest" id="pwaManifest">
+<meta name="theme-color" content="#1e40af">
+<style>
+:root{
+  --teal:#00C2CB; --magenta:#FF00FF; --yellow:#FFC700; --black:#000000; --white:#FFFFFF; --beige:#F5F3DC;
+  --bg:var(--beige); --card:var(--white); --text:#000000; --muted:#555048; --border:#000000;
+  --danger:#FF3B3B; --success:#00B86B; --warn:var(--yellow);
+  --radius:0px; --radius-sm:4px;
+  --shadow-1:4px 4px 0 var(--black); --shadow-2:8px 8px 0 var(--black);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Arial Black','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+html,body{height:100%;}
+button{font-family:inherit;cursor:pointer;border:none;}
+input,select,textarea{font-family:inherit;}
+.app{display:flex;min-height:100vh;}
+.sidebar{width:230px;background:var(--black);color:#fff;display:flex;flex-direction:column;padding:20px 0;flex-shrink:0;border-right:4px solid var(--black);}
+.sidebar h2{padding:0 20px 20px;font-size:20px;border-bottom:3px solid var(--yellow);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+.nav-item{padding:14px 20px;cursor:pointer;opacity:.9;font-size:13px;font-weight:800;text-transform:uppercase;display:flex;align-items:center;gap:10px;border-left:4px solid transparent;}
+.nav-item.active{background:var(--teal);color:#000;opacity:1;border-left:4px solid var(--black);}
+.nav-item:hover{opacity:1;background:rgba(255,255,255,.1);}
+.main{flex:1;padding:28px;overflow-y:auto;max-width:100%;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+.topbar h1{font-size:28px;text-transform:uppercase;font-weight:900;letter-spacing:.5px;}
+.btn{background:var(--teal);color:#000;padding:11px 20px;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;
+  border:3px solid var(--black);box-shadow:var(--shadow-1);transition:transform .08s,box-shadow .08s;}
+.btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--black);}
+.btn:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--black);}
+.btn.danger{background:var(--magenta);color:#fff;}
+.btn.success{background:var(--success);color:#fff;}
+.btn.ghost{background:var(--white);color:#000;}
+.btn.small{padding:7px 14px;font-size:11px;box-shadow:3px 3px 0 var(--black);}
+.btn.small:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--black);}
+.card{background:var(--card);border:3px solid var(--black);box-shadow:var(--shadow-2);padding:22px;margin-bottom:20px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{padding:10px;text-align:left;border-bottom:2px solid var(--black);}
+th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;font-size:11px;letter-spacing:.3px;}
+.badge{padding:4px 12px;border:2px solid var(--black);font-size:11px;font-weight:900;text-transform:uppercase;display:inline-block;}
+.badge.green{background:var(--success);color:#fff;}
+.badge.yellow{background:var(--yellow);color:#000;}
+.badge.red{background:var(--magenta);color:#fff;animation:pulse 1.2s infinite;}
+.badge.gray{background:var(--beige);color:#000;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.card h3{font-size:16px;text-transform:uppercase;font-weight:900;letter-spacing:.3px;border-bottom:3px solid var(--yellow);display:inline-block;padding-bottom:4px;}
+.form-row{margin-bottom:16px;}
+.form-row label{display:block;font-size:12px;font-weight:900;margin-bottom:6px;color:#000;text-transform:uppercase;letter-spacing:.3px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:11px 12px;border:3px solid var(--black);font-size:14px;background:#fff;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:3px solid var(--teal);outline-offset:1px;}
+.hidden{display:none !important;}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--black);padding:20px;
+  background-image:linear-gradient(var(--teal) 2px, transparent 2px),linear-gradient(90deg, var(--teal) 2px, transparent 2px);
+  background-size:40px 40px; background-color:#0a0a0a;}
+.login-card{background:var(--white);border:4px solid var(--black);box-shadow:var(--shadow-2);padding:38px 32px;max-width:380px;width:100%;}
+.login-card h1{text-align:center;color:#000;margin-bottom:6px;font-size:28px;text-transform:uppercase;font-weight:900;}
+.login-card p.sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:24px;font-weight:700;}
+.role-tabs{display:flex;gap:8px;margin-bottom:22px;}
+.role-tabs button{flex:1;padding:11px;background:var(--white);color:#000;font-weight:900;font-size:12px;border:3px solid var(--black);text-transform:uppercase;}
+.role-tabs button.active{background:var(--yellow);box-shadow:3px 3px 0 var(--black);}
+.error-msg{background:var(--magenta);color:#fff;padding:10px;border:2px solid var(--black);font-size:13px;font-weight:800;margin-bottom:14px;}
+.preview-banner{background:var(--yellow);color:#000;text-align:center;padding:9px;font-size:12px;font-weight:900;border-bottom:3px solid var(--black);text-transform:uppercase;}
+/* Exam taking */
+.exam-screen{min-height:100vh;background:var(--beige);display:flex;flex-direction:column;}
+.exam-header{background:var(--black);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;border-bottom:4px solid var(--yellow);}
+.timer{font-size:22px;font-weight:900;background:var(--yellow);color:#000;padding:7px 18px;border:3px solid var(--black);}
+.exam-body{flex:1;padding:22px;max-width:700px;margin:0 auto;width:100%;}
+.soal-nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.soal-nav button{width:38px;height:38px;background:#fff;border:3px solid var(--black);font-weight:900;font-size:12px;}
+.soal-nav button.answered{background:var(--teal);}
+.soal-nav button.current{background:var(--magenta);color:#fff;}
+.opsi-item{display:flex;align-items:center;gap:10px;padding:13px;border:3px solid var(--black);margin-bottom:10px;cursor:pointer;background:#fff;font-weight:700;}
+.opsi-item:hover{background:#fffde7;}
+.opsi-item.selected{background:var(--teal);box-shadow:var(--shadow-1);}
+.match-row{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+.lock-overlay{position:fixed;inset:0;background:var(--black);color:#fff;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;}
+.lock-overlay h2{font-size:26px;margin-bottom:12px;color:var(--yellow);text-transform:uppercase;font-weight:900;border:3px solid var(--yellow);padding:10px 20px;}
+.warn-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--magenta);color:#fff;padding:14px 24px;border:3px solid var(--black);z-index:9998;font-weight:900;box-shadow:var(--shadow-2);text-transform:uppercase;font-size:13px;}
+@media(max-width:768px){
+  .sidebar{position:fixed;bottom:0;left:0;right:0;width:100%;flex-direction:row;justify-content:space-around;padding:8px 0;z-index:100;top:auto;height:auto;border-right:none;border-top:4px solid var(--yellow);}
+  .sidebar h2{display:none;}
+  .nav-item{flex-direction:column;font-size:9px;padding:8px 4px;flex:1;text-align:center;gap:2px;border-left:none;}
+  .nav-item.active{border-left:none;border-top:4px solid var(--teal);}
+  .main{padding-bottom:90px;}
+}
+</style>
+</head>
+<body>
+<div id="appRoot"></div>
+<div id="toastRoot"></div>
+<script type="module">
+// ====================== KONFIGURASI APLIKASI ======================
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE GOOGLE APPS SCRIPT
+
+// ====================== PWA SETUP (Manifest + Service Worker) ======================
+const manifest = {
+  name: "CBT Sekolah", short_name: "CBT", start_url: ".", display: "standalone",
+  background_color: "#f1f5f9", theme_color: "#1e40af",
+  icons: [{src:"data:image/svg+xml;base64,"+btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%231e40af"/><text x="50" y="62" font-size="40" fill="white" text-anchor="middle" font-family="Arial">CBT</text></svg>'), sizes:"100x100", type:"image/svg+xml"}]
+};
+document.getElementById('pwaManifest').href = "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest));
+if ('serviceWorker' in navigator) {
+  const swCode = `self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>{});`;
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+}
+
+// ====================== DATA API (Preview vs Produksi) ======================
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+function nowISO(){ return new Date().toISOString(); }
+
+let PREVIEW_DB = {
+  admin: [{username:'admin', password:'admin2026'}],
+  guru: [{id_guru:'g1', nama:'Budi Santoso', mapel:'Matematika', username:'budi', password:'guru123', status_aktif:true}],
+  siswa: [
+    {id_siswa:'s1', nama:'Ani Lestari', nisn:'1001', kelas:'9A'},
+    {id_siswa:'s2', nama:'Rudi Hartono', nisn:'1002', kelas:'9A'}
+  ],
+  bankSoal: [
+    {id_soal:'q1', id_guru:'g1', mapel:'Matematika', tipe_soal:'pg', pertanyaan:'Berapakah hasil dari 12 x 8?',
+      data_soal:{opsi:[{k:'a',v:'86'},{k:'b',v:'96'},{k:'c',v:'106'},{k:'d',v:'88'}]}, kunci_jawaban:{benar:'b'}, bobot:10},
+    {id_soal:'q2', id_guru:'g1', mapel:'Matematika', tipe_soal:'benar_salah', pertanyaan:'Bilangan prima terkecil adalah 2.',
+      data_soal:{}, kunci_jawaban:{benar:true}, bobot:10},
+    {id_soal:'q3', id_guru:'g1', mapel:'Matematika', tipe_soal:'pg_kompleks', pertanyaan:'Manakah bilangan genap di bawah ini? (pilih 2)',
+      data_soal:{opsi:[{k:'a',v:'3'},{k:'b',v:'4'},{k:'c',v:'7'},{k:'d',v:'8'}]}, kunci_jawaban:{benar:['b','d']}, bobot:10},
+    {id_soal:'q4', id_guru:'g1', mapel:'Matematika', tipe_soal:'menjodohkan', pertanyaan:'Jodohkan bangun datar dengan jumlah sisinya',
+      data_soal:{kiri:[{k:'1',v:'Segitiga'},{k:'2',v:'Persegi'}], kanan:[{k:'a',v:'4 sisi'},{k:'b',v:'3 sisi'}]},
+      kunci_jawaban:{pasangan:{'1':'b','2':'a'}}, bobot:10}
+  ],
+  ujian: [{id_ujian:'u1', id_guru:'g1', nama_ujian:'Ulangan Harian Matematika', mapel:'Matematika', kelas:'9A',
+    tanggal:'2026-11-20', durasi_menit:30, daftar_id_soal:['q1','q2','q3','q4'], status:'aktif', batas_pelanggaran:3}],
+  token: [{token_code:'MTK001', id_ujian:'u1', status_dipakai:false, waktu_generate:nowISO(), waktu_expired:null}],
+  hasilUjian: []
+};
+
+function callServer(fnName, ...args){
+  if (IS_PREVIEW) return Promise.resolve(PreviewAPI[fnName](...args));
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fnName](...args);
+  });
+}
+
+const PreviewAPI = {
+  loginAdmin(u,p){ const a = PREVIEW_DB.admin.find(x=>x.username===u && x.password===p); return a? {success:true, data:{username:a.username}} : {success:false, message:'Username atau password salah'}; },
+  loginGuru(u,p){ const g = PREVIEW_DB.guru.find(x=>x.username===u && x.password===p); if(!g) return {success:false, message:'Username atau password salah'}; if(!g.status_aktif) return {success:false, message:'Akun dinonaktifkan oleh admin'}; return {success:true, data:g}; },
+  loginSiswaToken(token, nama, nisn){
+    const t = PREVIEW_DB.token.find(x=>x.token_code===token);
+    if(!t) return {success:false, message:'Token tidak ditemukan'};
+    if(t.status_dipakai) return {success:false, message:'Token sudah digunakan'};
+    const ujian = PREVIEW_DB.ujian.find(x=>x.id_ujian===t.id_ujian);
+    if(!ujian) return {success:false, message:'Ujian tidak ditemukan'};
+    const siswa = PREVIEW_DB.siswa.find(x=>x.nisn===nisn) || {id_siswa:uid('s'), nama, nisn, kelas:ujian.kelas};
+    t.status_dipakai = true;
+    const soalList = ujian.daftar_id_soal.map(id=>{ const s = PREVIEW_DB.bankSoal.find(b=>b.id_soal===id); return {id_soal:s.id_soal, tipe_soal:s.tipe_soal, pertanyaan:s.pertanyaan, data_soal:s.data_soal, bobot:s.bobot}; });
+    const id_hasil = uid('h');
+    PREVIEW_DB.hasilUjian.push({id_hasil, id_ujian:ujian.id_ujian, id_siswa:siswa.id_siswa, nama_siswa:siswa.nama, token_dipakai:token,
+      jawaban_json:{}, nilai:null, waktu_mulai:nowISO(), waktu_selesai:null, status:'dikerjakan', jumlah_pelanggaran:0, log_pelanggaran:[]});
+    return {success:true, data:{id_hasil, ujian, soalList}};
+  },
+  getGuruList(){ return PREVIEW_DB.guru; },
+  addGuru(obj){ obj.id_guru = uid('g'); obj.status_aktif = true; PREVIEW_DB.guru.push(obj); return {success:true}; },
+  resetPasswordGuru(id_guru, newPassword){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) g.password = newPassword; return {success:true}; },
+  toggleGuruStatus(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) g.status_aktif = !g.status_aktif; return {success:true}; },
+  getSiswaList(){ return PREVIEW_DB.siswa; },
+  addSiswaBulk(list){ list.forEach(s=>{ s.id_siswa = uid('s'); PREVIEW_DB.siswa.push(s); }); return {success:true}; },
+  getSoalList(id_guru){ return PREVIEW_DB.bankSoal.filter(x=>x.id_guru===id_guru); },
+  saveSoal(obj){ if(obj.id_soal){ const i = PREVIEW_DB.bankSoal.findIndex(x=>x.id_soal===obj.id_soal); PREVIEW_DB.bankSoal[i] = obj; } else { obj.id_soal = uid('q'); PREVIEW_DB.bankSoal.push(obj); } return {success:true, id_soal:obj.id_soal}; },
+  importSoalBulk(list){ list.forEach(obj=>{ obj.id_soal = uid('q'); PREVIEW_DB.bankSoal.push(obj); }); return {success:true, jumlah:list.length}; },
+  deleteSoal(id_soal){ PREVIEW_DB.bankSoal = PREVIEW_DB.bankSoal.filter(x=>x.id_soal!==id_soal); return {success:true}; },
+  getUjianList(id_guru){ return PREVIEW_DB.ujian.filter(x=>x.id_guru===id_guru); },
+  getAllUjianList(){ return PREVIEW_DB.ujian; },
+  saveUjian(obj){ if(obj.id_ujian){ const i = PREVIEW_DB.ujian.findIndex(x=>x.id_ujian===obj.id_ujian); PREVIEW_DB.ujian[i] = obj; } else { obj.id_ujian = uid('u'); obj.status='aktif'; PREVIEW_DB.ujian.push(obj); } return {success:true, id_ujian:obj.id_ujian}; },
+  generateToken(id_ujian, jumlah){ const tokens=[]; for(let i=0;i<jumlah;i++){ const code = Math.random().toString(36).slice(2,8).toUpperCase(); PREVIEW_DB.token.push({token_code:code, id_ujian, status_dipakai:false, waktu_generate:nowISO(), waktu_expired:null}); tokens.push(code);} return {success:true, tokens}; },
+  getTokenList(id_ujian){ return PREVIEW_DB.token.filter(x=>x.id_ujian===id_ujian); },
+  reportViolation(id_hasil){
+    const h = PREVIEW_DB.hasilUjian.find(x=>x.id_hasil===id_hasil);
+    if(!h) return {success:false};
+    h.jumlah_pelanggaran++;
+    h.log_pelanggaran.push({waktu:nowISO()});
+    const ujian = PREVIEW_DB.ujian.find(x=>x.id_ujian===h.id_ujian);
+    let locked = false;
+    if(h.jumlah_pelanggaran >= ujian.batas_pelanggaran && h.status==='dikerjakan'){ h.status = 'terkunci_menunggu_persetujuan'; locked = true; }
+    return {success:true, locked, jumlah_pelanggaran:h.jumlah_pelanggaran};
+  },
+  getHasilStatus(id_hasil){ const h = PREVIEW_DB.hasilUjian.find(x=>x.id_hasil===id_hasil); return h? {status:h.status, jumlah_pelanggaran:h.jumlah_pelanggaran} : {status:'tidak_ditemukan'}; },
+  getMonitoring(id_ujian){ return PREVIEW_DB.hasilUjian.filter(x=>x.id_ujian===id_ujian).map(h=>({id_hasil:h.id_hasil, nama_siswa:h.nama_siswa, status:h.status, jumlah_pelanggaran:h.jumlah_pelanggaran})); },
+  approveSiswa(id_hasil){ const h = PREVIEW_DB.hasilUjian.find(x=>x.id_hasil===id_hasil); if(h){ h.status='dikerjakan'; h.riwayat_keputusan = h.riwayat_keputusan||[]; h.riwayat_keputusan.push({aksi:'izinkan_lanjut', waktu:nowISO()}); } return {success:true}; },
+  forceSubmitSiswa(id_hasil){ return PreviewAPI.submitJawaban(id_hasil, null, true); },
+  submitJawaban(id_hasil, jawabanJson, dipaksaGuru){
+    const h = PREVIEW_DB.hasilUjian.find(x=>x.id_hasil===id_hasil);
+    if(!h) return {success:false};
+    if(jawabanJson) h.jawaban_json = jawabanJson;
+    const ujian = PREVIEW_DB.ujian.find(x=>x.id_ujian===h.id_ujian);
+    let total=0, maks=0;
+    ujian.daftar_id_soal.forEach(idSoal=>{
+      const soal = PREVIEW_DB.bankSoal.find(x=>x.id_soal===idSoal);
+      maks += soal.bobot;
+      const jwb = h.jawaban_json[idSoal];
+      if(jwb===undefined) return;
+      if(soal.tipe_soal==='pg' || soal.tipe_soal==='benar_salah'){ if(jwb === soal.kunci_jawaban.benar) total += soal.bobot; }
+      else if(soal.tipe_soal==='pg_kompleks'){
+        const benar = soal.kunci_jawaban.benar.slice().sort().join(',');
+        const jawab = (jwb||[]).slice().sort().join(',');
+        if(benar===jawab) total += soal.bobot;
+      } else if(soal.tipe_soal==='menjodohkan'){
+        const pasangan = soal.kunci_jawaban.pasangan; let semuaBenar = true;
+        Object.keys(pasangan).forEach(k=>{ if(!jwb || jwb[k]!==pasangan[k]) semuaBenar=false; });
+        if(semuaBenar) total += soal.bobot;
+      }
+    });
+    h.nilai = maks>0 ? Math.round((total/maks)*100) : 0;
+    h.status = 'selesai';
+    h.waktu_selesai = nowISO();
+    return {success:true, nilai:h.nilai};
+  },
+  getHasilUjian(id_ujian){ return PREVIEW_DB.hasilUjian.filter(x=>x.id_ujian===id_ujian); },
+  publishHasil(id_ujian){ PREVIEW_DB.hasilUjian.filter(x=>x.id_ujian===id_ujian).forEach(h=> h.dipublikasikan = true); return {success:true}; },
+  getHasilSiswa(id_hasil){ const h = PREVIEW_DB.hasilUjian.find(x=>x.id_hasil===id_hasil); return h? {nilai:h.nilai, dipublikasikan: !!h.dipublikasikan, status:h.status} : null; }
+};
+
+// ====================== STATE & ROUTER ======================
+let STATE = { role:null, user:null, view:'dashboard', examData:null, examAnswers:{}, examTimer:null, examSecondsLeft:0, lockPollTimer:null, cheatCount:0 };
+const root = document.getElementById('appRoot');
+const toastRoot = document.getElementById('toastRoot');
+
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = 'warn-toast';
+  if(type==='success') el.style.background = 'var(--success)';
+  el.textContent = msg;
+  toastRoot.appendChild(el);
+  setTimeout(()=> el.remove(), 3500);
+}
+
+function render(){
+  if(!STATE.role){ renderLogin(); return; }
+  if(STATE.role==='siswa' && STATE.examData){ renderExam(); return; }
+  if(STATE.role==='admin') renderAdmin();
+  else if(STATE.role==='guru') renderGuru();
+}
+
+// ---------- LOGIN ----------
+let loginTab = 'guru';
+function renderLogin(){
+  root.innerHTML = `
+  <div class="login-wrap">
+    <div class="login-card">
+      ${IS_PREVIEW ? '<div class="preview-banner" style="margin:-36px -30px 20px;border-radius:18px 18px 0 0;">MODE PREVIEW — Admin: admin/admin2026 | Guru: budi/guru123 | Token Siswa: MTK001</div>':''}
+      <h1>CBT Sekolah</h1>
+      <p class="sub">Ujian Berbasis Komputer</p>
+      <div class="role-tabs">
+        <button id="tabGuru" class="${loginTab==='guru'?'active':''}">Guru/Admin</button>
+        <button id="tabSiswa" class="${loginTab==='siswa'?'active':''}">Siswa</button>
+      </div>
+      <div id="errBox"></div>
+      <div id="loginFormWrap"></div>
+    </div>
+  </div>`;
+  document.getElementById('tabGuru').onclick = ()=>{ loginTab='guru'; renderLogin(); };
+  document.getElementById('tabSiswa').onclick = ()=>{ loginTab='siswa'; renderLogin(); };
+  const wrap = document.getElementById('loginFormWrap');
+  if(loginTab==='guru'){
+    wrap.innerHTML = `
+      <div class="form-row"><label>Username</label><input id="lu" placeholder="Username Admin / Guru"></div>
+      <div class="form-row"><label>Password</label><input id="lp" type="password" placeholder="Password"></div>
+      <button class="btn" style="width:100%" id="btnLoginGuru">Masuk</button>`;
+    document.getElementById('btnLoginGuru').onclick = async ()=>{
+      const u = document.getElementById('lu').value.trim(), p = document.getElementById('lp').value;
+      let res = await callServer('loginAdmin', u, p);
+      if(res.success){ STATE.role='admin'; STATE.user=res.data; render(); return; }
+      res = await callServer('loginGuru', u, p);
+      if(res.success){ STATE.role='guru'; STATE.user=res.data; render(); return; }
+      document.getElementById('errBox').innerHTML = `<div class="error-msg">${res.message||'Login gagal'}</div>`;
+    };
+  } else {
+    wrap.innerHTML = `
+      <div class="form-row"><label>Nomor Token Ujian</label><input id="ltoken" placeholder="Masukkan token dari guru" style="text-transform:uppercase"></div>
+      <div class="form-row"><label>Nama Lengkap</label><input id="lnama" placeholder="Nama sesuai absen"></div>
+      <div class="form-row"><label>NISN</label><input id="lnisn" placeholder="NISN"></div>
+      <button class="btn" style="width:100%" id="btnLoginSiswa">Mulai Ujian</button>`;
+    document.getElementById('btnLoginSiswa').onclick = async ()=>{
+      const token = document.getElementById('ltoken').value.trim().toUpperCase();
+      const nama = document.getElementById('lnama').value.trim();
+      const nisn = document.getElementById('lnisn').value.trim();
+      if(!token || !nama || !nisn){ document.getElementById('errBox').innerHTML = `<div class="error-msg">Semua kolom wajib diisi</div>`; return; }
+      const res = await callServer('loginSiswaToken', token, nama, nisn);
+      if(!res.success){ document.getElementById('errBox').innerHTML = `<div class="error-msg">${res.message}</div>`; return; }
+      STATE.role='siswa'; STATE.user={nama, nisn};
+      startExamSession(res.data);
+    };
+  }
+}
+
+function logout(){
+  if(STATE.examTimer) clearInterval(STATE.examTimer);
+  if(STATE.lockPollTimer) clearInterval(STATE.lockPollTimer);
+  STATE = { role:null, user:null, view:'dashboard', examData:null, examAnswers:{}, examTimer:null, examSecondsLeft:0, lockPollTimer:null, cheatCount:0 };
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  render();
+}
+
+// ---------- LAYOUT SHELL ----------
+function shell(navItems, title, contentHtml){
+  root.innerHTML = `
+  <div class="app">
+    <div class="sidebar">
+      <h2>CBT Sekolah</h2>
+      ${navItems.map(n=>`<div class="nav-item ${STATE.view===n.key?'active':''}" data-nav="${n.key}">${n.label}</div>`).join('')}
+      <div class="nav-item" id="btnLogout">Keluar</div>
+    </div>
+    <div class="main">
+      <div class="topbar"><h1>${title}</h1><span style="color:var(--muted);font-size:13px">${STATE.user.nama||STATE.user.username}</span></div>
+      <div id="content">${contentHtml}</div>
+    </div>
+  </div>`;
+  navItems.forEach(n=>{ document.querySelector(`[data-nav="${n.key}"]`).onclick = ()=>{ STATE.view = n.key; render(); }; });
+  document.getElementById('btnLogout').onclick = logout;
+}
+
+// ---------- ADMIN ----------
+async function renderAdmin(){
+  const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'siswa',label:'Kelola Siswa'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
+  let html = '';
+  if(STATE.view==='dashboard'){
+    const guruList = await callServer('getGuruList');
+    const siswaList = await callServer('getSiswaList');
+    const ujianList = await callServer('getAllUjianList');
+    html = `<div class="grid">
+      <div class="card"><div style="color:var(--muted);font-size:13px">Total Guru</div><div style="font-size:28px;font-weight:800">${guruList.length}</div></div>
+      <div class="card"><div style="color:var(--muted);font-size:13px">Total Siswa</div><div style="font-size:28px;font-weight:800">${siswaList.length}</div></div>
+      <div class="card"><div style="color:var(--muted);font-size:13px">Total Ujian</div><div style="font-size:28px;font-weight:800">${ujianList.length}</div></div>
+    </div>`;
+  } else if(STATE.view==='guru'){
+    html = await renderKelolaGuru();
+  } else if(STATE.view==='siswa'){
+    html = await renderKelolaSiswa();
+  } else if(STATE.view==='ujian'){
+    const list = await callServer('getAllUjianList');
+    html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Mapel</th><th>Kelas</th><th>Tanggal</th><th>Status</th></tr></thead><tbody>
+      ${list.map(u=>`<tr><td>${u.nama_ujian}</td><td>${u.mapel}</td><td>${u.kelas}</td><td>${u.tanggal}</td><td><span class="badge green">${u.status}</span></td></tr>`).join('') || '<tr><td colspan="5">Belum ada ujian</td></tr>'}
+    </tbody></table></div>`;
+  } else if(STATE.view==='rekap'){
+    const ujianList = await callServer('getAllUjianList');
+    let rows = '';
+    for(const u of ujianList){
+      const hasil = await callServer('getHasilUjian', u.id_ujian);
+      rows += hasil.map(h=>`<tr><td>${u.nama_ujian}</td><td>${h.nama_siswa}</td><td>${h.nilai ?? '-'}</td><td>${h.status}</td></tr>`).join('');
+    }
+    html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Siswa</th><th>Nilai</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Belum ada hasil</td></tr>'}</tbody></table></div>`;
+  }
+  shell(nav, nav.find(n=>n.key===STATE.view).label, html);
+  if(STATE.view==='guru') bindKelolaGuru();
+  if(STATE.view==='siswa') bindKelolaSiswa();
+}
+
+async function renderKelolaGuru(){
+  const list = await callServer('getGuruList');
+  window.__guruList = list;
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Tambah Guru Baru</h3>
+    <div class="grid">
+      <div class="form-row"><label>Nama</label><input id="ng_nama"></div>
+      <div class="form-row"><label>Mapel</label><input id="ng_mapel"></div>
+      <div class="form-row"><label>Username</label><input id="ng_username"></div>
+      <div class="form-row"><label>Password</label><input id="ng_password"></div>
+    </div>
+    <button class="btn" id="btnAddGuru">Tambah Guru</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Nama</th><th>Mapel</th><th>Username</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+    ${list.map(g=>`<tr><td>${g.nama}</td><td>${g.mapel}</td><td>${g.username}</td><td><span class="badge ${g.status_aktif?'green':'red'}">${g.status_aktif?'Aktif':'Nonaktif'}</span></td>
+      <td><button class="btn small ghost" data-reset="${g.id_guru}">Reset Password</button> <button class="btn small danger" data-toggle="${g.id_guru}">${g.status_aktif?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function bindKelolaGuru(){
+  document.getElementById('btnAddGuru').onclick = async ()=>{
+    const obj = { nama:ng_nama.value, mapel:ng_mapel.value, username:ng_username.value, password:ng_password.value };
+    if(!obj.nama||!obj.username||!obj.password){ toast('Lengkapi semua kolom'); return; }
+    await callServer('addGuru', obj); toast('Guru ditambahkan','success'); renderAdmin();
+  };
+  document.querySelectorAll('[data-reset]').forEach(b=> b.onclick = async ()=>{
+    const np = prompt('Masukkan password baru untuk guru ini:');
+    if(np){ await callServer('resetPasswordGuru', b.dataset.reset, np); toast('Password berhasil direset','success'); }
+  });
+  document.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = async ()=>{ await callServer('toggleGuruStatus', b.dataset.toggle); renderAdmin(); });
+}
+
+async function renderKelolaSiswa(){
+  const list = await callServer('getSiswaList');
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Tambah Siswa</h3>
+    <div class="grid">
+      <div class="form-row"><label>Nama</label><input id="ns_nama"></div>
+      <div class="form-row"><label>NISN</label><input id="ns_nisn"></div>
+      <div class="form-row"><label>Kelas</label><input id="ns_kelas" placeholder="contoh: 9A"></div>
+    </div>
+    <button class="btn" id="btnAddSiswa">Tambah Siswa</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Nama</th><th>NISN</th><th>Kelas</th></tr></thead><tbody>
+    ${list.map(s=>`<tr><td>${s.nama}</td><td>${s.nisn}</td><td>${s.kelas}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function bindKelolaSiswa(){
+  document.getElementById('btnAddSiswa').onclick = async ()=>{
+    const obj = { nama:ns_nama.value, nisn:ns_nisn.value, kelas:ns_kelas.value };
+    if(!obj.nama||!obj.nisn||!obj.kelas){ toast('Lengkapi semua kolom'); return; }
+    await callServer('addSiswaBulk', [obj]); toast('Siswa ditambahkan','success'); renderAdmin();
+  };
+}
+
+// ---------- GURU ----------
+async function renderGuru(){
+  const nav = [{key:'dashboard',label:'Dashboard'},{key:'soal',label:'Bank Soal'},{key:'ujian',label:'Buat Ujian'},{key:'token',label:'Token & Peserta'},{key:'monitoring',label:'Monitoring Live'},{key:'hasil',label:'Hasil Ujian'}];
+  let html='';
+  if(STATE.view==='dashboard'){
+    const soal = await callServer('getSoalList', STATE.user.id_guru);
+    const ujian = await callServer('getUjianList', STATE.user.id_guru);
+    html = `<div class="grid">
+      <div class="card"><div style="color:var(--muted);font-size:13px">Bank Soal</div><div style="font-size:28px;font-weight:800">${soal.length}</div></div>
+      <div class="card"><div style="color:var(--muted);font-size:13px">Ujian Dibuat</div><div style="font-size:28px;font-weight:800">${ujian.length}</div></div>
+    </div>`;
+  } else if(STATE.view==='soal'){ html = await renderBankSoal(); }
+  else if(STATE.view==='ujian'){ html = await renderBuatUjian(); }
+  else if(STATE.view==='token'){ html = await renderTokenPeserta(); }
+  else if(STATE.view==='monitoring'){ html = await renderMonitoring(); }
+  else if(STATE.view==='hasil'){ html = await renderHasilUjian(); }
+  shell(nav, nav.find(n=>n.key===STATE.view).label, html);
+  if(STATE.view==='soal') bindBankSoal();
+  if(STATE.view==='ujian') bindBuatUjian();
+  if(STATE.view==='token') bindTokenPeserta();
+  if(STATE.view==='monitoring') bindMonitoring();
+  if(STATE.view==='hasil') bindHasilUjian();
+}
+
+// --- Bank Soal ---
+let soalFormType = 'pg';
+async function renderBankSoal(){
+  const list = await callServer('getSoalList', STATE.user.id_guru);
+  window.__soalList = list;
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Tambah Soal</h3>
+    <div class="form-row"><label>Tipe Soal</label>
+      <select id="sq_tipe">
+        <option value="pg">Pilihan Ganda</option>
+        <option value="menjodohkan">Menjodohkan</option>
+        <option value="pg_kompleks">Pilihan Ganda Kompleks (2 jawaban benar)</option>
+        <option value="benar_salah">Benar/Salah</option>
+      </select>
+    </div>
+    <div class="form-row"><label>Pertanyaan</label><textarea id="sq_pertanyaan" rows="2"></textarea></div>
+    <div id="sq_dynamic"></div>
+    <div class="form-row" style="max-width:150px"><label>Bobot Nilai</label><input id="sq_bobot" type="number" value="10"></div>
+    <button class="btn" id="btnSimpanSoal">Simpan Soal</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:10px">Impor Soal dari CSV</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;font-weight:700">Format kolom: tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot. Untuk PG/PG Kompleks: data1-4=opsi A-D, kunci="a" atau "a|c". Benar/Salah: kosongkan data1-4, kunci="benar"/"salah". Menjodohkan: data1=kiri dipisah "|", data2=kanan dipisah "|" (urutan sama=berpasangan), kunci dikosongkan.</p>
+    <button class="btn ghost small" id="btnDownloadTemplate" style="margin-bottom:14px">Unduh Template CSV</button>
+    <div class="form-row"><label>Pilih File CSV</label><input type="file" id="sq_importfile" accept=".csv"></div>
+    <button class="btn" id="btnImportSoal">Impor Soal</button>
+    <div id="importResultBox" style="margin-top:10px;font-size:13px;font-weight:700"></div>
+  </div>
+  <div class="card"><table><thead><tr><th>Tipe</th><th>Pertanyaan</th><th>Bobot</th><th>Aksi</th></tr></thead><tbody>
+    ${list.map(s=>`<tr><td><span class="badge gray">${labelTipe(s.tipe_soal)}</span></td><td>${s.pertanyaan}</td><td>${s.bobot}</td><td><button class="btn small danger" data-delsoal="${s.id_soal}">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada soal</td></tr>'}
+  </tbody></table></div>`;
+}
+
+function parseCSVLine(line){
+  // Parser CSV sederhana yang mendukung tanda kutip ganda
+  const result = []; let cur=''; let inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch==='"'){ inQuotes = !inQuotes; }
+    else if(ch===',' && !inQuotes){ result.push(cur); cur=''; }
+    else { cur += ch; }
+  }
+  result.push(cur);
+  return result.map(x=>x.trim());
+}
+
+function buildSoalFromCSVRow(cols, id_guru, mapel){
+  const [tipe_soal, pertanyaan, d1, d2, d3, d4, kunci, bobotStr] = cols;
+  const bobot = parseInt(bobotStr) || 10;
+  let data_soal = {}, kunci_jawaban = {};
+  if(tipe_soal==='pg'){
+    data_soal = { opsi:[{k:'a',v:d1},{k:'b',v:d2},{k:'c',v:d3},{k:'d',v:d4}] };
+    kunci_jawaban = { benar: kunci.trim() };
+  } else if(tipe_soal==='pg_kompleks'){
+    data_soal = { opsi:[{k:'a',v:d1},{k:'b',v:d2},{k:'c',v:d3},{k:'d',v:d4}] };
+    kunci_jawaban = { benar: kunci.split('|').map(x=>x.trim()) };
+  } else if(tipe_soal==='benar_salah'){
+    kunci_jawaban = { benar: kunci.trim().toLowerCase()==='benar' };
+  } else if(tipe_soal==='menjodohkan'){
+    const kiriArr = d1.split('|').map(x=>x.trim()).filter(Boolean);
+    const kananArr = d2.split('|').map(x=>x.trim()).filter(Boolean);
+    const kiri = kiriArr.map((v,i)=>({k:String(i+1), v}));
+    const kanan = kananArr.map((v,i)=>({k:String.fromCharCode(97+i), v}));
+    const pasangan = {}; kiri.forEach((k,i)=> pasangan[k.k] = kanan[i] ? kanan[i].k : '');
+    data_soal = { kiri, kanan };
+    kunci_jawaban = { pasangan };
+  } else {
+    return null;
+  }
+  return { id_guru, mapel, tipe_soal, pertanyaan, data_soal, kunci_jawaban, bobot };
+}
+
+function downloadTextFile(filename, content, mime){
+  const blob = new Blob([content], {type: mime || 'text/plain;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function labelTipe(t){ return {pg:'Pilihan Ganda', menjodohkan:'Menjodohkan', pg_kompleks:'PG Kompleks', benar_salah:'Benar/Salah'}[t]||t; }
+
+function renderSoalDynamicForm(tipe){
+  const el = document.getElementById('sq_dynamic');
+  if(tipe==='pg'){
+    el.innerHTML = `
+      <div class="form-row"><label>Opsi A</label><input id="sq_a"></div>
+      <div class="form-row"><label>Opsi B</label><input id="sq_b"></div>
+      <div class="form-row"><label>Opsi C</label><input id="sq_c"></div>
+      <div class="form-row"><label>Opsi D</label><input id="sq_d"></div>
+      <div class="form-row"><label>Jawaban Benar</label><select id="sq_kunci"><option value="a">A</option><option value="b">B</option><option value="c">C</option><option value="d">D</option></select></div>`;
+  } else if(tipe==='pg_kompleks'){
+    el.innerHTML = `
+      <div class="form-row"><label>Opsi A</label><input id="sq_a"></div>
+      <div class="form-row"><label>Opsi B</label><input id="sq_b"></div>
+      <div class="form-row"><label>Opsi C</label><input id="sq_c"></div>
+      <div class="form-row"><label>Opsi D</label><input id="sq_d"></div>
+      <div class="form-row"><label>2 Jawaban Benar (pisah koma, contoh: a,c)</label><input id="sq_kunci" placeholder="a,c"></div>`;
+  } else if(tipe==='benar_salah'){
+    el.innerHTML = `<div class="form-row"><label>Jawaban Benar</label><select id="sq_kunci"><option value="true">Benar</option><option value="false">Salah</option></select></div>`;
+  } else if(tipe==='menjodohkan'){
+    el.innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Isi daftar kiri & kanan dipisah baris baru, dengan urutan yang sama berarti berpasangan</p>
+      <div class="grid">
+        <div class="form-row"><label>Kolom Kiri (soal)</label><textarea id="sq_kiri" rows="4" placeholder="Segitiga&#10;Persegi"></textarea></div>
+        <div class="form-row"><label>Kolom Kanan (jawaban - akan diacak saat tampil)</label><textarea id="sq_kanan" rows="4" placeholder="3 sisi&#10;4 sisi"></textarea></div>
+      </div>`;
+  }
+}
+function bindBankSoal(){
+  renderSoalDynamicForm(soalFormType);
+  document.getElementById('sq_tipe').value = soalFormType;
+  document.getElementById('sq_tipe').onchange = (e)=>{ soalFormType = e.target.value; renderSoalDynamicForm(soalFormType); };
+  document.getElementById('btnSimpanSoal').onclick = async ()=>{
+    const tipe = document.getElementById('sq_tipe').value;
+    const pertanyaan = document.getElementById('sq_pertanyaan').value.trim();
+    const bobot = parseInt(document.getElementById('sq_bobot').value)||10;
+    if(!pertanyaan){ toast('Pertanyaan wajib diisi'); return; }
+    let data_soal={}, kunci_jawaban={};
+    if(tipe==='pg'){
+      data_soal = { opsi:[{k:'a',v:sq_a.value},{k:'b',v:sq_b.value},{k:'c',v:sq_c.value},{k:'d',v:sq_d.value}] };
+      kunci_jawaban = { benar: sq_kunci.value };
+    } else if(tipe==='pg_kompleks'){
+      data_soal = { opsi:[{k:'a',v:sq_a.value},{k:'b',v:sq_b.value},{k:'c',v:sq_c.value},{k:'d',v:sq_d.value}] };
+      kunci_jawaban = { benar: sq_kunci.value.split(',').map(x=>x.trim()) };
+    } else if(tipe==='benar_salah'){
+      kunci_jawaban = { benar: sq_kunci.value === 'true' };
+    } else if(tipe==='menjodohkan'){
+      const kiriArr = sq_kiri.value.split('\n').filter(Boolean);
+      const kananArr = sq_kanan.value.split('\n').filter(Boolean);
+      const kiri = kiriArr.map((v,i)=>({k:String(i+1), v}));
+      const kanan = kananArr.map((v,i)=>({k:String.fromCharCode(97+i), v}));
+      const pasangan = {}; kiri.forEach((k,i)=> pasangan[k.k] = kanan[i].k);
+      data_soal = { kiri, kanan };
+      kunci_jawaban = { pasangan };
+    }
+    await callServer('saveSoal', { id_guru:STATE.user.id_guru, mapel:STATE.user.mapel, tipe_soal:tipe, pertanyaan, data_soal, kunci_jawaban, bobot });
+    toast('Soal tersimpan','success'); renderGuru();
+  };
+  document.querySelectorAll('[data-delsoal]').forEach(b=> b.onclick = async ()=>{ await callServer('deleteSoal', b.dataset.delsoal); renderGuru(); });
+
+  document.getElementById('btnDownloadTemplate').onclick = ()=>{
+    const template = 'tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot\n' +
+      'pg,Berapakah hasil dari 5 + 3?,6,7,8,9,c,10\n' +
+      'pg_kompleks,Manakah bilangan genap? (pilih 2),3,4,7,8,b|d,10\n' +
+      'benar_salah,Matahari terbit dari timur,,,,,,benar,10\n' +
+      'menjodohkan,Jodohkan ibu kota dengan negaranya,Indonesia|Jepang,Jakarta|Tokyo,,,,10\n';
+    downloadTextFile('template_impor_soal.csv', template, 'text/csv;charset=utf-8;');
+  };
+  document.getElementById('btnImportSoal').onclick = ()=>{
+    const fileInput = document.getElementById('sq_importfile');
+    const resultBox = document.getElementById('importResultBox');
+    if(!fileInput.files || !fileInput.files[0]){ toast('Pilih file CSV terlebih dahulu'); return; }
+    const reader = new FileReader();
+    reader.onload = async (e)=>{
+      const text = e.target.result;
+      const lines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
+      lines.shift(); // buang baris header
+      const soalArray = [];
+      let gagal = 0;
+      lines.forEach(line=>{
+        const cols = parseCSVLine(line);
+        if(cols.length < 8){ gagal++; return; }
+        const soal = buildSoalFromCSVRow(cols, STATE.user.id_guru, STATE.user.mapel);
+        if(soal) soalArray.push(soal); else gagal++;
+      });
+      if(soalArray.length===0){ resultBox.innerHTML = '<span style="color:var(--danger)">Tidak ada soal valid ditemukan di file.</span>'; return; }
+      await callServer('importSoalBulk', soalArray);
+      resultBox.innerHTML = `<span style="color:var(--success)">${soalArray.length} soal berhasil diimpor.${gagal>0 ? ' ('+gagal+' baris dilewati karena format salah)' : ''}</span>`;
+      toast(`${soalArray.length} soal berhasil diimpor`,'success');
+      setTimeout(()=>renderGuru(), 1200);
+    };
+    reader.readAsText(fileInput.files[0]);
+  };
+}
+
+// --- Buat Ujian ---
+async function renderBuatUjian(){
+  const soalList = await callServer('getSoalList', STATE.user.id_guru);
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Buat Ujian Baru</h3>
+    <div class="grid">
+      <div class="form-row"><label>Nama Ujian</label><input id="uj_nama"></div>
+      <div class="form-row"><label>Kelas</label><input id="uj_kelas" placeholder="contoh: 9A"></div>
+      <div class="form-row"><label>Tanggal</label><input id="uj_tanggal" type="date"></div>
+      <div class="form-row"><label>Durasi (menit)</label><input id="uj_durasi" type="number" value="60"></div>
+      <div class="form-row"><label>Batas Pelanggaran (sebelum dikunci)</label><input id="uj_batas" type="number" value="3"></div>
+    </div>
+    <div class="form-row"><label>Pilih Soal</label>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px">
+      ${soalList.map(s=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="chk-soal" value="${s.id_soal}"> ${s.pertanyaan} <span class="badge gray">${labelTipe(s.tipe_soal)}</span></label>`).join('') || 'Belum ada soal di Bank Soal'}
+      </div>
+    </div>
+    <button class="btn" id="btnBuatUjian">Simpan Ujian</button>
+  </div>
+  <div class="card"><h3 style="margin-bottom:14px">Daftar Ujian Saya</h3>
+  <table><thead><tr><th>Nama</th><th>Kelas</th><th>Tanggal</th><th>Durasi</th><th>Jml Soal</th></tr></thead><tbody id="ujianListBody"><tr><td colspan="5">Memuat...</td></tr></tbody></table></div>`;
+}
+async function bindBuatUjian(){
+  const list = await callServer('getUjianList', STATE.user.id_guru);
+  document.getElementById('ujianListBody').innerHTML = list.map(u=>`<tr><td>${u.nama_ujian}</td><td>${u.kelas}</td><td>${u.tanggal}</td><td>${u.durasi_menit} mnt</td><td>${u.daftar_id_soal.length}</td></tr>`).join('') || '<tr><td colspan="5">Belum ada ujian</td></tr>';
+  document.getElementById('btnBuatUjian').onclick = async ()=>{
+    const ids = Array.from(document.querySelectorAll('.chk-soal:checked')).map(c=>c.value);
+    if(!uj_nama.value || !uj_kelas.value || !uj_tanggal.value || ids.length===0){ toast('Lengkapi data & pilih minimal 1 soal'); return; }
+    await callServer('saveUjian', { id_guru:STATE.user.id_guru, nama_ujian:uj_nama.value, mapel:STATE.user.mapel, kelas:uj_kelas.value,
+      tanggal:uj_tanggal.value, durasi_menit:parseInt(uj_durasi.value), daftar_id_soal:ids, batas_pelanggaran:parseInt(uj_batas.value)||3 });
+    toast('Ujian berhasil dibuat','success'); renderGuru();
+  };
+}
+
+// --- Token & Peserta ---
+let tokenSelectedUjian = null;
+async function renderTokenPeserta(){
+  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  tokenSelectedUjian = tokenSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
+  let tokenListHtml = '<tr><td colspan="3">Pilih ujian dahulu</td></tr>';
+  if(tokenSelectedUjian){
+    const tokens = await callServer('getTokenList', tokenSelectedUjian);
+    tokenListHtml = tokens.map(t=>`<tr><td style="font-family:monospace;font-weight:700">${t.token_code}</td><td><span class="badge ${t.status_dipakai?'gray':'green'}">${t.status_dipakai?'Terpakai':'Belum dipakai'}</span></td><td>${new Date(t.waktu_generate).toLocaleString('id-ID')}</td></tr>`).join('') || '<tr><td colspan="3">Belum ada token</td></tr>';
+  }
+  return `
+  <div class="card">
+    <div class="form-row"><label>Pilih Ujian</label>
+      <select id="tk_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===tokenSelectedUjian?'selected':''}>${u.nama_ujian} - ${u.kelas}</option>`).join('')}</select>
+    </div>
+    <div class="form-row" style="max-width:150px"><label>Jumlah Token</label><input id="tk_jumlah" type="number" value="5"></div>
+    <button class="btn" id="btnGenToken">Generate Token</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Token</th><th>Status</th><th>Waktu Dibuat</th></tr></thead><tbody id="tokenListBody">${tokenListHtml}</tbody></table></div>`;
+}
+function bindTokenPeserta(){
+  document.getElementById('tk_ujian').onchange = (e)=>{ tokenSelectedUjian = e.target.value; renderGuru(); };
+  document.getElementById('btnGenToken').onclick = async ()=>{
+    const jumlah = parseInt(document.getElementById('tk_jumlah').value)||1;
+    await callServer('generateToken', tokenSelectedUjian, jumlah);
+    toast('Token berhasil dibuat','success'); renderGuru();
+  };
+}
+
+// --- Monitoring Live ---
+let monitorSelectedUjian = null, monitorPoll = null;
+async function renderMonitoring(){
+  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  monitorSelectedUjian = monitorSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
+  return `
+  <div class="card">
+    <div class="form-row"><label>Pilih Ujian</label>
+      <select id="mo_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===monitorSelectedUjian?'selected':''}>${u.nama_ujian} - ${u.kelas}</option>`).join('')}</select>
+    </div>
+  </div>
+  <div class="card"><table><thead><tr><th>Siswa</th><th>Status</th><th>Pelanggaran</th><th>Aksi</th></tr></thead><tbody id="monitorBody"><tr><td colspan="4">Memuat...</td></tr></tbody></table></div>`;
+}
+async function refreshMonitor(){
+  if(!monitorSelectedUjian) return;
+  const data = await callServer('getMonitoring', monitorSelectedUjian);
+  const body = document.getElementById('monitorBody');
+  if(!body) return;
+  body.innerHTML = data.map(h=>{
+    let badge = 'green';
+    if(h.jumlah_pelanggaran>=3 || h.status==='terkunci_menunggu_persetujuan') badge='red';
+    else if(h.jumlah_pelanggaran>=1) badge='yellow';
+    if(h.status==='selesai') badge='gray';
+    let statusLabel = h.status==='dikerjakan'?'Mengerjakan': h.status==='selesai'?'Selesai': h.status==='terkunci_menunggu_persetujuan'?'MENUNGGU PERSETUJUAN':h.status;
+    let aksi = '-';
+    if(h.status==='terkunci_menunggu_persetujuan'){
+      aksi = `<button class="btn small success" data-approve="${h.id_hasil}">Izinkan Lanjut</button> <button class="btn small danger" data-forcesubmit="${h.id_hasil}">Paksa Submit</button>`;
+    }
+    return `<tr><td>${h.nama_siswa}</td><td><span class="badge ${badge}">${statusLabel}</span></td><td>${h.jumlah_pelanggaran}</td><td>${aksi}</td></tr>`;
+  }).join('') || '<tr><td colspan="4">Belum ada peserta mengerjakan</td></tr>';
+  document.querySelectorAll('[data-approve]').forEach(b=> b.onclick = async ()=>{ await callServer('approveSiswa', b.dataset.approve); toast('Siswa diizinkan melanjutkan','success'); refreshMonitor(); });
+  document.querySelectorAll('[data-forcesubmit]').forEach(b=> b.onclick = async ()=>{ if(confirm('Paksa submit jawaban siswa ini sekarang?')){ await callServer('forceSubmitSiswa', b.dataset.forcesubmit); toast('Ujian siswa dipaksa submit','success'); refreshMonitor(); } });
+}
+function bindMonitoring(){
+  document.getElementById('mo_ujian').onchange = (e)=>{ monitorSelectedUjian = e.target.value; refreshMonitor(); };
+  refreshMonitor();
+  if(monitorPoll) clearInterval(monitorPoll);
+  monitorPoll = setInterval(refreshMonitor, 4000);
+}
+
+// --- Hasil Ujian ---
+let hasilSelectedUjian = null;
+async function renderHasilUjian(){
+  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  hasilSelectedUjian = hasilSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
+  let rows = '<tr><td colspan="4">Pilih ujian</td></tr>';
+  if(hasilSelectedUjian){
+    const hasil = await callServer('getHasilUjian', hasilSelectedUjian);
+    rows = hasil.map(h=>`<tr><td>${h.nama_siswa}</td><td>${h.nilai ?? '-'}</td><td>${h.status}</td><td>${h.jumlah_pelanggaran}</td></tr>`).join('') || '<tr><td colspan="4">Belum ada yang mengerjakan</td></tr>';
+  }
+  return `
+  <div class="card">
+    <div class="form-row"><label>Pilih Ujian</label>
+      <select id="hs_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===hasilSelectedUjian?'selected':''}>${u.nama_ujian} - ${u.kelas}</option>`).join('')}</select>
+    </div>
+    <button class="btn" id="btnPublish">Publikasikan Nilai ke Siswa</button>
+    <button class="btn ghost" id="btnExportCSV">Ekspor Rekap Nilai (CSV)</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Siswa</th><th>Nilai</th><th>Status</th><th>Pelanggaran</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function bindHasilUjian(){
+  document.getElementById('hs_ujian').onchange = (e)=>{ hasilSelectedUjian = e.target.value; renderGuru(); };
+  document.getElementById('btnPublish').onclick = async ()=>{ await callServer('publishHasil', hasilSelectedUjian); toast('Nilai dipublikasikan ke siswa','success'); };
+  document.getElementById('btnExportCSV').onclick = async ()=>{
+    const hasil = await callServer('getHasilUjian', hasilSelectedUjian);
+    const selectEl = document.getElementById('hs_ujian');
+    const namaUjian = selectEl.options[selectEl.selectedIndex].text;
+    if(!hasil || hasil.length===0){ toast('Belum ada data nilai untuk diekspor'); return; }
+    let csv = 'Nama Siswa,Nilai,Status,Jumlah Pelanggaran,Waktu Mulai,Waktu Selesai\n';
+    hasil.forEach(h=>{
+      const row = [h.nama_siswa, h.nilai ?? '-', h.status, h.jumlah_pelanggaran, h.waktu_mulai||'', h.waktu_selesai||'']
+        .map(v=> `"${String(v).replace(/"/g,'""')}"`).join(',');
+      csv += row + '\n';
+    });
+    downloadTextFile(`rekap_nilai_${namaUjian.replace(/[^a-z0-9]/gi,'_')}.csv`, csv, 'text/csv;charset=utf-8;');
+    toast('Rekap nilai berhasil diekspor','success');
+  };
+}
+
+// ====================== HALAMAN UJIAN SISWA ======================
+function startExamSession(data){
+  STATE.examData = data; // {id_hasil, ujian, soalList}
+  STATE.examAnswers = {};
+  STATE.examSecondsLeft = data.ujian.durasi_menit * 60;
+  STATE.currentSoalIndex = 0;
+  STATE.cheatCount = 0;
+  STATE.examLocked = false;
+  render();
+  setTimeout(enterFullscreenAndMonitor, 300);
+}
+
+function enterFullscreenAndMonitor(){
+  const el = document.documentElement;
+  if(el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('contextmenu', blockContext);
+  document.addEventListener('keydown', blockDevKeys);
+  startExamTimer();
+}
+function stopExamMonitoring(){
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
+  document.removeEventListener('contextmenu', blockContext);
+  document.removeEventListener('keydown', blockDevKeys);
+}
+function blockContext(e){ if(STATE.role==='siswa' && STATE.examData) e.preventDefault(); }
+function blockDevKeys(e){
+  if(!STATE.examData) return;
+  if(e.key==='F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) || (e.ctrlKey && e.key==='u')){
+    e.preventDefault(); handleViolation();
+  }
+}
+function onVisibilityChange(){ if(document.hidden && STATE.examData && !STATE.examLocked) handleViolation(); }
+function onFullscreenChange(){ if(!document.fullscreenElement && STATE.examData && !STATE.examLocked) handleViolation(); }
+
+async function handleViolation(){
+  if(!STATE.examData || STATE.examLocked) return;
+  STATE.cheatCount++;
+  const res = await callServer('reportViolation', STATE.examData.id_hasil);
+  if(res.locked){
+    STATE.examLocked = true;
+    clearInterval(STATE.examTimer);
+    renderExam();
+    startLockPolling();
+  } else {
+    toast(`Peringatan! Anda terdeteksi mencoba keluar dari ujian (${res.jumlah_pelanggaran}x). Pelanggaran dicatat pengawas.`);
+    if(STATE.role==='siswa') setTimeout(()=>{ const el=document.documentElement; if(el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(()=>{}); }, 500);
+    renderExam();
+  }
+}
+
+function startLockPolling(){
+  if(STATE.lockPollTimer) clearInterval(STATE.lockPollTimer);
+  STATE.lockPollTimer = setInterval(async ()=>{
+    const res = await callServer('getHasilStatus', STATE.examData.id_hasil);
+    if(res.status === 'dikerjakan'){
+      clearInterval(STATE.lockPollTimer);
+      STATE.examLocked = false;
+      toast('Pengawas mengizinkan Anda melanjutkan ujian','success');
+      renderExam();
+      const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+      startExamTimer();
+    } else if(res.status === 'selesai'){
+      clearInterval(STATE.lockPollTimer);
+      finishExamUI(null);
+    }
+  }, 3000);
+}
+
+function startExamTimer(){
+  if(STATE.examTimer) clearInterval(STATE.examTimer);
+  STATE.examTimer = setInterval(()=>{
+    if(STATE.examLocked) return;
+    STATE.examSecondsLeft--;
+    const tmEl = document.getElementById('examTimerDisplay');
+    if(tmEl) tmEl.textContent = formatTime(STATE.examSecondsLeft);
+    if(STATE.examSecondsLeft <= 0){ clearInterval(STATE.examTimer); submitExam(true); }
+  }, 1000);
+}
+function formatTime(s){ const m = Math.floor(s/60); const sec = s%60; return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
+
+function renderExam(){
+  if(STATE.examLocked){
+    root.innerHTML = `<div class="lock-overlay">
+      <h2>🔒 Ujian Dikunci</h2>
+      <p>Anda terlalu banyak melakukan percobaan keluar dari aplikasi ujian.</p>
+      <p style="margin-top:10px">Mohon tunggu, pengawas akan segera memeriksa dan memutuskan.</p>
+      <p style="margin-top:16px;font-size:13px;color:#fca5a5">Timer ujian telah dijeda sementara.</p>
+    </div>`;
+    return;
+  }
+  const { ujian, soalList } = STATE.examData;
+  const idx = STATE.currentSoalIndex;
+  const soal = soalList[idx];
+  root.innerHTML = `
+  <div class="exam-screen">
+    <div class="exam-header">
+      <div><strong>${ujian.nama_ujian}</strong><div style="font-size:11px;opacity:.8">${STATE.user.nama}</div></div>
+      <div class="timer" id="examTimerDisplay">${formatTime(STATE.examSecondsLeft)}</div>
+    </div>
+    <div class="exam-body">
+      <div class="soal-nav">
+        ${soalList.map((s,i)=>`<button class="${STATE.examAnswers[s.id_soal]!==undefined?'answered':''} ${i===idx?'current':''}" data-goto="${i}">${i+1}</button>`).join('')}
+      </div>
+      <div class="card">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Soal ${idx+1} dari ${soalList.length} — ${labelTipe(soal.tipe_soal)}</div>
+        <div style="font-weight:600;margin-bottom:16px">${soal.pertanyaan}</div>
+        <div id="soalContent"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:16px">
+        <button class="btn ghost" id="btnPrevSoal" ${idx===0?'disabled style="opacity:.4"':''}>Sebelumnya</button>
+        ${idx===soalList.length-1 ? '<button class="btn success" id="btnSelesai">Selesai & Kumpulkan</button>' : '<button class="btn" id="btnNextSoal">Selanjutnya</button>'}
+      </div>
+    </div>
+  </div>`;
+  renderSoalContent(soal);
+  soalList.forEach((s,i)=>{ document.querySelector(`[data-goto="${i}"]`).onclick = ()=>{ STATE.currentSoalIndex = i; renderExam(); }; });
+  if(idx>0) document.getElementById('btnPrevSoal').onclick = ()=>{ STATE.currentSoalIndex--; renderExam(); };
+  if(idx<soalList.length-1) document.getElementById('btnNextSoal').onclick = ()=>{ STATE.currentSoalIndex++; renderExam(); };
+  else document.getElementById('btnSelesai').onclick = ()=>{ if(confirm('Yakin ingin mengumpulkan jawaban? Jawaban tidak bisa diubah lagi.')) submitExam(false); };
+}
+
+function renderSoalContent(soal){
+  const el = document.getElementById('soalContent');
+  const current = STATE.examAnswers[soal.id_soal];
+  if(soal.tipe_soal==='pg'){
+    el.innerHTML = soal.data_soal.opsi.map(o=>`<div class="opsi-item ${current===o.k?'selected':''}" data-pick="${o.k}"><strong>${o.k.toUpperCase()}.</strong> ${o.v}</div>`).join('');
+    el.querySelectorAll('[data-pick]').forEach(d=> d.onclick = ()=>{ STATE.examAnswers[soal.id_soal] = d.dataset.pick; renderExam(); });
+  } else if(soal.tipe_soal==='pg_kompleks'){
+    const sel = current || [];
+    el.innerHTML = soal.data_soal.opsi.map(o=>`<div class="opsi-item ${sel.includes(o.k)?'selected':''}" data-pickm="${o.k}"><strong>${o.k.toUpperCase()}.</strong> ${o.v}</div>`).join('') + `<p style="font-size:12px;color:var(--muted);margin-top:6px">Pilih 2 jawaban yang benar</p>`;
+    el.querySelectorAll('[data-pickm]').forEach(d=> d.onclick = ()=>{
+      let arr = STATE.examAnswers[soal.id_soal] || [];
+      const k = d.dataset.pickm;
+      if(arr.includes(k)) arr = arr.filter(x=>x!==k);
+      else if(arr.length<2) arr = [...arr, k];
+      STATE.examAnswers[soal.id_soal] = arr; renderExam();
+    });
+  } else if(soal.tipe_soal==='benar_salah'){
+    el.innerHTML = `
+      <div class="opsi-item ${current===true?'selected':''}" data-bs="true">Benar</div>
+      <div class="opsi-item ${current===false?'selected':''}" data-bs="false">Salah</div>`;
+    el.querySelectorAll('[data-bs]').forEach(d=> d.onclick = ()=>{ STATE.examAnswers[soal.id_soal] = d.dataset.bs==='true'; renderExam(); });
+  } else if(soal.tipe_soal==='menjodohkan'){
+    const pasangan = current || {};
+    const kananShuffled = soal.data_soal.kanan;
+    el.innerHTML = soal.data_soal.kiri.map(k=>`
+      <div class="match-row"><div style="flex:1">${k.v}</div>
+      <select data-match="${k.k}" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:8px">
+        <option value="">-- pilih jawaban --</option>
+        ${kananShuffled.map(r=>`<option value="${r.k}" ${pasangan[k.k]===r.k?'selected':''}>${r.v}</option>`).join('')}
+      </select></div>`).join('');
+    el.querySelectorAll('[data-match]').forEach(sel2=> sel2.onchange = ()=>{
+      const p = STATE.examAnswers[soal.id_soal] || {};
+      p[sel2.dataset.match] = sel2.value;
+      STATE.examAnswers[soal.id_soal] = p;
+    });
+  }
+}
+
+async function submitExam(autoByTimer){
+  clearInterval(STATE.examTimer);
+  if(STATE.lockPollTimer) clearInterval(STATE.lockPollTimer);
+  const res = await callServer('submitJawaban', STATE.examData.id_hasil, STATE.examAnswers, false);
+  finishExamUI(res.nilai);
+}
+function finishExamUI(nilai){
+  stopExamMonitoring();
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  root.innerHTML = `
+  <div class="login-wrap"><div class="login-card" style="text-align:center">
+    <h1 style="color:var(--success)">✓ Ujian Selesai</h1>
+    <p class="sub">Terima kasih, jawaban Anda telah dikumpulkan.</p>
+    ${nilai!==null ? `<div style="font-size:13px;color:var(--muted);margin-top:10px">Nilai akan diumumkan oleh guru.</div>` : ''}
+    <button class="btn" style="width:100%;margin-top:20px" id="btnKembali">Kembali ke Halaman Masuk</button>
+  </div></div>`;
+  document.getElementById('btnKembali').onclick = logout;
+}
+
+// ====================== START APP ======================
+render();
+</script>
+</body>
+</html>
