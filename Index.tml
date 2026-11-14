@@ -96,7 +96,7 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 <div id="toastRoot"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE GOOGLE APPS SCRIPT
+const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE GOOGLE APPS SCRIPT
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
