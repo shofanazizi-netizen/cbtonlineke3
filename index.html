@@ -55,6 +55,31 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 .form-row label{display:block;font-size:12px;font-weight:900;margin-bottom:6px;color:#000;text-transform:uppercase;letter-spacing:.3px;}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:11px 12px;border:3px solid var(--black);font-size:14px;background:#fff;}
 .form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:3px solid var(--teal);outline-offset:1px;}
+/* Dropdown custom (hilangkan panah bawaan browser, ganti dengan panah kotak sendiri) */
+select{appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:linear-gradient(45deg, transparent 50%, var(--black) 50%), linear-gradient(135deg, var(--black) 50%, transparent 50%);
+  background-position:calc(100% - 20px) center, calc(100% - 14px) center; background-size:6px 6px, 6px 6px; background-repeat:no-repeat;
+  padding-right:36px !important; cursor:pointer;}
+select:hover{background-color:#fffde7;}
+/* Checkbox & radio custom persegi, tebal, isi solid saat dicentang */
+input[type="checkbox"],input[type="radio"]{appearance:none;-webkit-appearance:none;width:22px;height:22px;min-width:22px;
+  border:3px solid var(--black);background:#fff;cursor:pointer;position:relative;flex-shrink:0;vertical-align:middle;}
+input[type="radio"]{border-radius:50%;}
+input[type="checkbox"]:checked{background:var(--teal);}
+input[type="checkbox"]:checked::after{content:'';position:absolute;left:5px;top:1px;width:6px;height:11px;border:solid var(--black);border-width:0 3px 3px 0;transform:rotate(45deg);}
+input[type="radio"]:checked{background:#fff;}
+input[type="radio"]:checked::after{content:'';position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--black);}
+/* File input custom (tombol pilih file ikut gaya brutalist) */
+input[type="file"]{border:3px dashed var(--black);padding:10px;background:#fffef5;cursor:pointer;font-size:13px;font-weight:700;}
+input[type="file"]::file-selector-button{background:var(--black);color:#fff;border:none;padding:9px 16px;font-weight:900;text-transform:uppercase;font-size:11px;margin-right:12px;cursor:pointer;letter-spacing:.3px;}
+input[type="file"]::file-selector-button:hover{background:var(--magenta);}
+/* Modal popup custom (pengganti confirm()/prompt() bawaan browser) */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.modal-box{background:var(--white);border:4px solid var(--black);box-shadow:var(--shadow-2);max-width:420px;width:100%;padding:28px;}
+.modal-box h3{font-size:18px;text-transform:uppercase;font-weight:900;margin-bottom:14px;border-bottom:3px solid var(--yellow);display:inline-block;padding-bottom:4px;}
+.modal-box p{font-size:14px;font-weight:600;margin-bottom:18px;line-height:1.5;}
+.modal-box input{width:100%;padding:11px 12px;border:3px solid var(--black);font-size:14px;margin-bottom:18px;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;}
 .hidden{display:none !important;}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--black);padding:20px;
   background-image:linear-gradient(var(--teal) 2px, transparent 2px),linear-gradient(90deg, var(--teal) 2px, transparent 2px);
@@ -97,10 +122,10 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 <div id="toastRoot"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -297,6 +322,59 @@ let STATE = { role:null, user:null, view:'dashboard', examData:null, examAnswers
 const root = document.getElementById('appRoot');
 const toastRoot = document.getElementById('toastRoot');
 
+// ====================== MODAL CUSTOM (pengganti confirm()/prompt() bawaan browser) ======================
+function closeModal(){
+  const ov = document.getElementById('customModalOverlay');
+  if(ov) ov.remove();
+}
+function showConfirmModal({title='Konfirmasi', message='', confirmLabel='Konfirmasi', cancelLabel='Batal', danger=false}){
+  return new Promise(resolve=>{
+    closeModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'customModalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h3>${title}</h3>
+        <p>${message}</p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="modalBtnCancel">${cancelLabel}</button>
+          <button class="btn ${danger?'danger':'success'}" id="modalBtnConfirm">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e)=>{ if(e.target===overlay){ closeModal(); resolve(false); } });
+    document.getElementById('modalBtnCancel').onclick = ()=>{ closeModal(); resolve(false); };
+    document.getElementById('modalBtnConfirm').onclick = ()=>{ closeModal(); resolve(true); };
+  });
+}
+function showPromptModal({title='Masukkan Data', message='', placeholder='', defaultValue='', confirmLabel='Simpan', cancelLabel='Batal', inputType='text'}){
+  return new Promise(resolve=>{
+    closeModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'customModalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box">
+        <h3>${title}</h3>
+        ${message ? `<p>${message}</p>` : ''}
+        <input type="${inputType}" id="modalPromptInput" placeholder="${placeholder}" value="${defaultValue}">
+        <div class="modal-actions">
+          <button class="btn ghost" id="modalBtnCancel">${cancelLabel}</button>
+          <button class="btn success" id="modalBtnConfirm">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const inputEl = document.getElementById('modalPromptInput');
+    setTimeout(()=> inputEl.focus(), 50);
+    const submit = ()=>{ const val = inputEl.value; closeModal(); resolve(val); };
+    overlay.addEventListener('click', (e)=>{ if(e.target===overlay){ closeModal(); resolve(null); } });
+    inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') submit(); });
+    document.getElementById('modalBtnCancel').onclick = ()=>{ closeModal(); resolve(null); };
+    document.getElementById('modalBtnConfirm').onclick = submit;
+  });
+}
+
 function toast(msg, type){
   const el = document.createElement('div');
   el.className = 'warn-toast';
@@ -461,7 +539,7 @@ function bindKelolaGuru(){
     await callServer('addGuru', obj); cacheInvalidate('guruList'); toast('Guru ditambahkan','success'); renderAdmin();
   };
   document.querySelectorAll('[data-reset]').forEach(b=> b.onclick = async ()=>{
-    const np = prompt('Masukkan password baru untuk guru ini:');
+    const np = await showPromptModal({ title:'Reset Password Guru', message:'Masukkan password baru untuk guru ini:', placeholder:'Password baru' });
     if(np){ await callServer('resetPasswordGuru', b.dataset.reset, np); cacheInvalidate('guruList'); toast('Password berhasil direset','success'); }
   });
   document.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = async ()=>{ await callServer('toggleGuruStatus', b.dataset.toggle); cacheInvalidate('guruList'); renderAdmin(); });
@@ -831,7 +909,10 @@ async function refreshMonitor(){
     return `<tr><td>${h.nama_siswa}</td><td><span class="badge ${badge}">${statusLabel}</span></td><td>${h.jumlah_pelanggaran}</td><td>${aksi}</td></tr>`;
   }).join('') || '<tr><td colspan="4">Belum ada peserta mengerjakan</td></tr>';
   document.querySelectorAll('[data-approve]').forEach(b=> b.onclick = async ()=>{ await callServer('approveSiswa', b.dataset.approve); toast('Siswa diizinkan melanjutkan','success'); refreshMonitor(); });
-  document.querySelectorAll('[data-forcesubmit]').forEach(b=> b.onclick = async ()=>{ if(confirm('Paksa submit jawaban siswa ini sekarang?')){ await callServer('forceSubmitSiswa', b.dataset.forcesubmit); toast('Ujian siswa dipaksa submit','success'); refreshMonitor(); } });
+  document.querySelectorAll('[data-forcesubmit]').forEach(b=> b.onclick = async ()=>{
+    const ok = await showConfirmModal({ title:'Paksa Submit', message:'Paksa submit jawaban siswa ini sekarang? Jawaban yang sudah ada akan langsung dinilai.', confirmLabel:'Ya, Paksa Submit', danger:true });
+    if(ok){ await callServer('forceSubmitSiswa', b.dataset.forcesubmit); toast('Ujian siswa dipaksa submit','success'); refreshMonitor(); }
+  });
 }
 function bindMonitoring(){
   document.getElementById('mo_ujian').onchange = (e)=>{ monitorSelectedUjian = e.target.value; refreshMonitor(); };
@@ -1001,7 +1082,10 @@ function renderExam(){
   soalList.forEach((s,i)=>{ document.querySelector(`[data-goto="${i}"]`).onclick = ()=>{ STATE.currentSoalIndex = i; renderExam(); }; });
   if(idx>0) document.getElementById('btnPrevSoal').onclick = ()=>{ STATE.currentSoalIndex--; renderExam(); };
   if(idx<soalList.length-1) document.getElementById('btnNextSoal').onclick = ()=>{ STATE.currentSoalIndex++; renderExam(); };
-  else document.getElementById('btnSelesai').onclick = ()=>{ if(confirm('Yakin ingin mengumpulkan jawaban? Jawaban tidak bisa diubah lagi.')) submitExam(false); };
+  else document.getElementById('btnSelesai').onclick = async ()=>{
+    const ok = await showConfirmModal({ title:'Kumpulkan Jawaban', message:'Yakin ingin mengumpulkan jawaban? Jawaban tidak bisa diubah lagi setelah ini.', confirmLabel:'Ya, Kumpulkan' });
+    if(ok) submitExam(false);
+  };
 }
 
 function renderSoalContent(soal){
