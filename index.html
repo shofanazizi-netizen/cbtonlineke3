@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>CBT Sekolah</title>
 <link rel="manifest" id="pwaManifest">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta name="theme-color" content="#1e40af">
 <style>
 :root{
@@ -96,10 +97,10 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 <div id="toastRoot"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -141,6 +142,56 @@ let PREVIEW_DB = {
   token: [{token_code:'MTK001', id_ujian:'u1', status_dipakai:false, waktu_generate:nowISO(), waktu_expired:null}],
   hasilUjian: []
 };
+
+// ====================== CACHE DATA DI BROWSER ======================
+// Tujuan: setelah login, data utama (bank soal, daftar ujian, dll) diunduh sekali lalu dipakai berulang
+// saat pindah menu — TIDAK memanggil Spreadsheet setiap kali. Cache otomatis kedaluwarsa & refresh
+// sendiri tiap 15 menit, dan langsung diperbarui begitu ada perubahan data (tambah/edit/hapus).
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 menit
+let AppCache = {}; // { key: { data, time } }
+function cacheGet(key){
+  const e = AppCache[key];
+  if(!e) return undefined;
+  if(Date.now() - e.time > CACHE_TTL_MS) return undefined; // kedaluwarsa, anggap tidak ada
+  return e.data;
+}
+function cacheSet(key, data){ AppCache[key] = { data, time: Date.now() }; }
+function cacheInvalidate(prefix){
+  Object.keys(AppCache).forEach(k => { if(k.startsWith(prefix)) delete AppCache[k]; });
+}
+async function cachedCall(key, fnName, args=[]){
+  const cached = cacheGet(key);
+  if(cached !== undefined) return cached;
+  const data = await callServer(fnName, ...args);
+  cacheSet(key, data);
+  return data;
+}
+
+let autoRefreshTimer = null;
+async function prefetchAllData(){
+  if(STATE.role==='admin'){
+    await Promise.all([
+      cachedCall('guruList','getGuruList'),
+      cachedCall('siswaList','getSiswaList'),
+      cachedCall('allUjianList','getAllUjianList')
+    ]);
+  } else if(STATE.role==='guru'){
+    await Promise.all([
+      cachedCall('soalList:'+STATE.user.id_guru,'getSoalList',[STATE.user.id_guru]),
+      cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru])
+    ]);
+  }
+}
+function startAutoRefresh(){
+  if(autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(async ()=>{
+    cacheInvalidate(''); // kosongkan semua cache (prefix kosong cocok dengan semua key)
+    await prefetchAllData();
+    render();
+    toast('Data diperbarui otomatis dari server','success');
+  }, CACHE_TTL_MS);
+}
+function stopAutoRefresh(){ if(autoRefreshTimer){ clearInterval(autoRefreshTimer); autoRefreshTimer=null; } }
 
 function callServer(fnName, ...args){
   if (IS_PREVIEW) return Promise.resolve(PreviewAPI[fnName](...args));
@@ -290,9 +341,9 @@ function renderLogin(){
     document.getElementById('btnLoginGuru').onclick = async ()=>{
       const u = document.getElementById('lu').value.trim(), p = document.getElementById('lp').value;
       let res = await callServer('loginAdmin', u, p);
-      if(res.success){ STATE.role='admin'; STATE.user=res.data; render(); return; }
+      if(res.success){ STATE.role='admin'; STATE.user=res.data; await prefetchAllData(); startAutoRefresh(); render(); return; }
       res = await callServer('loginGuru', u, p);
-      if(res.success){ STATE.role='guru'; STATE.user=res.data; render(); return; }
+      if(res.success){ STATE.role='guru'; STATE.user=res.data; await prefetchAllData(); startAutoRefresh(); render(); return; }
       document.getElementById('errBox').innerHTML = `<div class="error-msg">${res.message||'Login gagal'}</div>`;
     };
   } else {
@@ -317,6 +368,8 @@ function renderLogin(){
 function logout(){
   if(STATE.examTimer) clearInterval(STATE.examTimer);
   if(STATE.lockPollTimer) clearInterval(STATE.lockPollTimer);
+  stopAutoRefresh();
+  AppCache = {};
   STATE = { role:null, user:null, view:'dashboard', examData:null, examAnswers:{}, examTimer:null, examSecondsLeft:0, lockPollTimer:null, cheatCount:0 };
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   render();
@@ -332,12 +385,18 @@ function shell(navItems, title, contentHtml){
       <div class="nav-item" id="btnLogout">Keluar</div>
     </div>
     <div class="main">
-      <div class="topbar"><h1>${title}</h1><span style="color:var(--muted);font-size:13px">${STATE.user.nama||STATE.user.username}</span></div>
+      <div class="topbar"><h1>${title}</h1>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn small ghost" id="btnRefreshData" title="Ambil data terbaru dari server sekarang">Refresh Data</button>
+          <span style="color:var(--muted);font-size:13px;font-weight:700">${STATE.user.nama||STATE.user.username}</span>
+        </div>
+      </div>
       <div id="content">${contentHtml}</div>
     </div>
   </div>`;
   navItems.forEach(n=>{ document.querySelector(`[data-nav="${n.key}"]`).onclick = ()=>{ STATE.view = n.key; render(); }; });
   document.getElementById('btnLogout').onclick = logout;
+  document.getElementById('btnRefreshData').onclick = async ()=>{ cacheInvalidate(''); toast('Memuat data terbaru...'); await prefetchAllData(); render(); toast('Data berhasil diperbarui','success'); };
 }
 
 // ---------- ADMIN ----------
@@ -345,9 +404,9 @@ async function renderAdmin(){
   const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'siswa',label:'Kelola Siswa'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
   let html = '';
   if(STATE.view==='dashboard'){
-    const guruList = await callServer('getGuruList');
-    const siswaList = await callServer('getSiswaList');
-    const ujianList = await callServer('getAllUjianList');
+    const guruList = await cachedCall('guruList','getGuruList');
+    const siswaList = await cachedCall('siswaList','getSiswaList');
+    const ujianList = await cachedCall('allUjianList','getAllUjianList');
     html = `<div class="grid">
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Guru</div><div style="font-size:28px;font-weight:800">${guruList.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Siswa</div><div style="font-size:28px;font-weight:800">${siswaList.length}</div></div>
@@ -358,15 +417,15 @@ async function renderAdmin(){
   } else if(STATE.view==='siswa'){
     html = await renderKelolaSiswa();
   } else if(STATE.view==='ujian'){
-    const list = await callServer('getAllUjianList');
+    const list = await cachedCall('allUjianList','getAllUjianList');
     html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Mapel</th><th>Kelas</th><th>Tanggal</th><th>Status</th></tr></thead><tbody>
       ${list.map(u=>`<tr><td>${u.nama_ujian}</td><td>${u.mapel}</td><td>${u.kelas}</td><td>${u.tanggal}</td><td><span class="badge green">${u.status}</span></td></tr>`).join('') || '<tr><td colspan="5">Belum ada ujian</td></tr>'}
     </tbody></table></div>`;
   } else if(STATE.view==='rekap'){
-    const ujianList = await callServer('getAllUjianList');
+    const ujianList = await cachedCall('allUjianList','getAllUjianList');
     let rows = '';
     for(const u of ujianList){
-      const hasil = await callServer('getHasilUjian', u.id_ujian);
+      const hasil = await cachedCall('hasilUjian:'+u.id_ujian,'getHasilUjian',[u.id_ujian]);
       rows += hasil.map(h=>`<tr><td>${u.nama_ujian}</td><td>${h.nama_siswa}</td><td>${h.nilai ?? '-'}</td><td>${h.status}</td></tr>`).join('');
     }
     html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Siswa</th><th>Nilai</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Belum ada hasil</td></tr>'}</tbody></table></div>`;
@@ -377,7 +436,7 @@ async function renderAdmin(){
 }
 
 async function renderKelolaGuru(){
-  const list = await callServer('getGuruList');
+  const list = await cachedCall('guruList','getGuruList');
   window.__guruList = list;
   return `
   <div class="card">
@@ -399,17 +458,17 @@ function bindKelolaGuru(){
   document.getElementById('btnAddGuru').onclick = async ()=>{
     const obj = { nama:ng_nama.value, mapel:ng_mapel.value, username:ng_username.value, password:ng_password.value };
     if(!obj.nama||!obj.username||!obj.password){ toast('Lengkapi semua kolom'); return; }
-    await callServer('addGuru', obj); toast('Guru ditambahkan','success'); renderAdmin();
+    await callServer('addGuru', obj); cacheInvalidate('guruList'); toast('Guru ditambahkan','success'); renderAdmin();
   };
   document.querySelectorAll('[data-reset]').forEach(b=> b.onclick = async ()=>{
     const np = prompt('Masukkan password baru untuk guru ini:');
-    if(np){ await callServer('resetPasswordGuru', b.dataset.reset, np); toast('Password berhasil direset','success'); }
+    if(np){ await callServer('resetPasswordGuru', b.dataset.reset, np); cacheInvalidate('guruList'); toast('Password berhasil direset','success'); }
   });
-  document.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = async ()=>{ await callServer('toggleGuruStatus', b.dataset.toggle); renderAdmin(); });
+  document.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = async ()=>{ await callServer('toggleGuruStatus', b.dataset.toggle); cacheInvalidate('guruList'); renderAdmin(); });
 }
 
 async function renderKelolaSiswa(){
-  const list = await callServer('getSiswaList');
+  const list = await cachedCall('siswaList','getSiswaList');
   return `
   <div class="card">
     <h3 style="margin-bottom:14px">Tambah Siswa</h3>
@@ -428,7 +487,7 @@ function bindKelolaSiswa(){
   document.getElementById('btnAddSiswa').onclick = async ()=>{
     const obj = { nama:ns_nama.value, nisn:ns_nisn.value, kelas:ns_kelas.value };
     if(!obj.nama||!obj.nisn||!obj.kelas){ toast('Lengkapi semua kolom'); return; }
-    await callServer('addSiswaBulk', [obj]); toast('Siswa ditambahkan','success'); renderAdmin();
+    await callServer('addSiswaBulk', [obj]); cacheInvalidate('siswaList'); toast('Siswa ditambahkan','success'); renderAdmin();
   };
 }
 
@@ -437,8 +496,8 @@ async function renderGuru(){
   const nav = [{key:'dashboard',label:'Dashboard'},{key:'soal',label:'Bank Soal'},{key:'ujian',label:'Buat Ujian'},{key:'token',label:'Token & Peserta'},{key:'monitoring',label:'Monitoring Live'},{key:'hasil',label:'Hasil Ujian'}];
   let html='';
   if(STATE.view==='dashboard'){
-    const soal = await callServer('getSoalList', STATE.user.id_guru);
-    const ujian = await callServer('getUjianList', STATE.user.id_guru);
+    const soal = await cachedCall('soalList:'+STATE.user.id_guru,'getSoalList',[STATE.user.id_guru]);
+    const ujian = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
     html = `<div class="grid">
       <div class="card"><div style="color:var(--muted);font-size:13px">Bank Soal</div><div style="font-size:28px;font-weight:800">${soal.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Ujian Dibuat</div><div style="font-size:28px;font-weight:800">${ujian.length}</div></div>
@@ -459,7 +518,7 @@ async function renderGuru(){
 // --- Bank Soal ---
 let soalFormType = 'pg';
 async function renderBankSoal(){
-  const list = await callServer('getSoalList', STATE.user.id_guru);
+  const list = await cachedCall('soalList:'+STATE.user.id_guru,'getSoalList',[STATE.user.id_guru]);
   window.__soalList = list;
   return `
   <div class="card">
@@ -480,8 +539,11 @@ async function renderBankSoal(){
   <div class="card">
     <h3 style="margin-bottom:10px">Impor Soal dari CSV</h3>
     <p style="font-size:12px;color:var(--muted);margin-bottom:14px;font-weight:700">Format kolom: tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot. Untuk PG/PG Kompleks: data1-4=opsi A-D, kunci="a" atau "a|c". Benar/Salah: kosongkan data1-4, kunci="benar"/"salah". Menjodohkan: data1=kiri dipisah "|", data2=kanan dipisah "|" (urutan sama=berpasangan), kunci dikosongkan.</p>
-    <button class="btn ghost small" id="btnDownloadTemplate" style="margin-bottom:14px">Unduh Template CSV</button>
-    <div class="form-row"><label>Pilih File CSV</label><input type="file" id="sq_importfile" accept=".csv"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn ghost small" id="btnDownloadTemplateCSV">Unduh Template CSV</button>
+      <button class="btn ghost small" id="btnDownloadTemplateXLSX">Unduh Template Excel (.xlsx)</button>
+    </div>
+    <div class="form-row"><label>Pilih File (CSV atau Excel .xlsx)</label><input type="file" id="sq_importfile" accept=".csv,.xlsx,.xls"></div>
     <button class="btn" id="btnImportSoal">Impor Soal</button>
     <div id="importResultBox" style="margin-top:10px;font-size:13px;font-weight:700"></div>
   </div>
@@ -594,48 +656,87 @@ function bindBankSoal(){
       kunci_jawaban = { pasangan };
     }
     await callServer('saveSoal', { id_guru:STATE.user.id_guru, mapel:STATE.user.mapel, tipe_soal:tipe, pertanyaan, data_soal, kunci_jawaban, bobot });
+    cacheInvalidate('soalList:'+STATE.user.id_guru);
     toast('Soal tersimpan','success'); renderGuru();
   };
-  document.querySelectorAll('[data-delsoal]').forEach(b=> b.onclick = async ()=>{ await callServer('deleteSoal', b.dataset.delsoal); renderGuru(); });
+  document.querySelectorAll('[data-delsoal]').forEach(b=> b.onclick = async ()=>{ await callServer('deleteSoal', b.dataset.delsoal); cacheInvalidate('soalList:'+STATE.user.id_guru); renderGuru(); });
 
-  document.getElementById('btnDownloadTemplate').onclick = ()=>{
-    const template = 'tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot\n' +
-      'pg,Berapakah hasil dari 5 + 3?,6,7,8,9,c,10\n' +
-      'pg_kompleks,Manakah bilangan genap? (pilih 2),3,4,7,8,b|d,10\n' +
-      'benar_salah,Matahari terbit dari timur,,,,,,benar,10\n' +
-      'menjodohkan,Jodohkan ibu kota dengan negaranya,Indonesia|Jepang,Jakarta|Tokyo,,,,10\n';
-    downloadTextFile('template_impor_soal.csv', template, 'text/csv;charset=utf-8;');
+  const TEMPLATE_ROWS = [
+    ['tipe_soal','pertanyaan','data1','data2','data3','data4','kunci','bobot'],
+    ['pg','Berapakah hasil dari 5 + 3?','6','7','8','9','c','10'],
+    ['pg_kompleks','Manakah bilangan genap? (pilih 2)','3','4','7','8','b|d','10'],
+    ['benar_salah','Matahari terbit dari timur','','','','','benar','10'],
+    ['menjodohkan','Jodohkan ibu kota dengan negaranya','Indonesia|Jepang','Jakarta|Tokyo','','','','10']
+  ];
+  document.getElementById('btnDownloadTemplateCSV').onclick = ()=>{
+    const csv = TEMPLATE_ROWS.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    downloadTextFile('template_impor_soal.csv', csv, 'text/csv;charset=utf-8;');
   };
+  document.getElementById('btnDownloadTemplateXLSX').onclick = ()=>{
+    const ws = XLSX.utils.aoa_to_sheet(TEMPLATE_ROWS);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Soal');
+    XLSX.writeFile(wb, 'template_impor_soal.xlsx');
+  };
+
+  function processImportedRows(rowsAsArrays){
+    const resultBox = document.getElementById('importResultBox');
+    // baris pertama dianggap header, dibuang
+    const dataRows = rowsAsArrays.slice(1).filter(r => r && r.some(c => c !== undefined && c !== null && String(c).trim() !== ''));
+    const soalArray = [];
+    let gagal = 0;
+    dataRows.forEach(row=>{
+      const cols = [0,1,2,3,4,5,6,7].map(i => row[i]===undefined || row[i]===null ? '' : String(row[i]).trim());
+      if(!cols[0] || !cols[1]){ gagal++; return; }
+      const soal = buildSoalFromCSVRow(cols, STATE.user.id_guru, STATE.user.mapel);
+      if(soal) soalArray.push(soal); else gagal++;
+    });
+    if(soalArray.length===0){ resultBox.innerHTML = '<span style="color:var(--danger)">Tidak ada soal valid ditemukan di file.</span>'; return; }
+    callServer('importSoalBulk', soalArray).then(()=>{
+      cacheInvalidate('soalList:'+STATE.user.id_guru);
+      resultBox.innerHTML = `<span style="color:var(--success)">${soalArray.length} soal berhasil diimpor.${gagal>0 ? ' ('+gagal+' baris dilewati karena format salah/kosong)' : ''}</span>`;
+      toast(`${soalArray.length} soal berhasil diimpor`,'success');
+      setTimeout(()=>renderGuru(), 1200);
+    });
+  }
+
   document.getElementById('btnImportSoal').onclick = ()=>{
     const fileInput = document.getElementById('sq_importfile');
     const resultBox = document.getElementById('importResultBox');
-    if(!fileInput.files || !fileInput.files[0]){ toast('Pilih file CSV terlebih dahulu'); return; }
-    const reader = new FileReader();
-    reader.onload = async (e)=>{
-      const text = e.target.result;
-      const lines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
-      lines.shift(); // buang baris header
-      const soalArray = [];
-      let gagal = 0;
-      lines.forEach(line=>{
-        const cols = parseCSVLine(line);
-        if(cols.length < 8){ gagal++; return; }
-        const soal = buildSoalFromCSVRow(cols, STATE.user.id_guru, STATE.user.mapel);
-        if(soal) soalArray.push(soal); else gagal++;
-      });
-      if(soalArray.length===0){ resultBox.innerHTML = '<span style="color:var(--danger)">Tidak ada soal valid ditemukan di file.</span>'; return; }
-      await callServer('importSoalBulk', soalArray);
-      resultBox.innerHTML = `<span style="color:var(--success)">${soalArray.length} soal berhasil diimpor.${gagal>0 ? ' ('+gagal+' baris dilewati karena format salah)' : ''}</span>`;
-      toast(`${soalArray.length} soal berhasil diimpor`,'success');
-      setTimeout(()=>renderGuru(), 1200);
-    };
-    reader.readAsText(fileInput.files[0]);
+    if(!fileInput.files || !fileInput.files[0]){ toast('Pilih file terlebih dahulu'); return; }
+    const file = fileInput.files[0];
+    const namaFile = file.name.toLowerCase();
+    if(namaFile.endsWith('.xlsx') || namaFile.endsWith('.xls')){
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        try{
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          processImportedRows(rows);
+        } catch(err){
+          resultBox.innerHTML = `<span style="color:var(--danger)">Gagal membaca file Excel: ${err.message}</span>`;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        const text = e.target.result;
+        const lines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
+        const rows = lines.map(line => parseCSVLine(line));
+        processImportedRows(rows);
+      };
+      reader.readAsText(file);
+    }
   };
 }
 
 // --- Buat Ujian ---
 async function renderBuatUjian(){
-  const soalList = await callServer('getSoalList', STATE.user.id_guru);
+  const soalList = await cachedCall('soalList:'+STATE.user.id_guru,'getSoalList',[STATE.user.id_guru]);
   return `
   <div class="card">
     <h3 style="margin-bottom:14px">Buat Ujian Baru</h3>
@@ -657,13 +758,14 @@ async function renderBuatUjian(){
   <table><thead><tr><th>Nama</th><th>Kelas</th><th>Tanggal</th><th>Durasi</th><th>Jml Soal</th></tr></thead><tbody id="ujianListBody"><tr><td colspan="5">Memuat...</td></tr></tbody></table></div>`;
 }
 async function bindBuatUjian(){
-  const list = await callServer('getUjianList', STATE.user.id_guru);
+  const list = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
   document.getElementById('ujianListBody').innerHTML = list.map(u=>`<tr><td>${u.nama_ujian}</td><td>${u.kelas}</td><td>${u.tanggal}</td><td>${u.durasi_menit} mnt</td><td>${u.daftar_id_soal.length}</td></tr>`).join('') || '<tr><td colspan="5">Belum ada ujian</td></tr>';
   document.getElementById('btnBuatUjian').onclick = async ()=>{
     const ids = Array.from(document.querySelectorAll('.chk-soal:checked')).map(c=>c.value);
     if(!uj_nama.value || !uj_kelas.value || !uj_tanggal.value || ids.length===0){ toast('Lengkapi data & pilih minimal 1 soal'); return; }
     await callServer('saveUjian', { id_guru:STATE.user.id_guru, nama_ujian:uj_nama.value, mapel:STATE.user.mapel, kelas:uj_kelas.value,
       tanggal:uj_tanggal.value, durasi_menit:parseInt(uj_durasi.value), daftar_id_soal:ids, batas_pelanggaran:parseInt(uj_batas.value)||3 });
+    cacheInvalidate('ujianList:'+STATE.user.id_guru); cacheInvalidate('allUjianList');
     toast('Ujian berhasil dibuat','success'); renderGuru();
   };
 }
@@ -671,11 +773,11 @@ async function bindBuatUjian(){
 // --- Token & Peserta ---
 let tokenSelectedUjian = null;
 async function renderTokenPeserta(){
-  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
   tokenSelectedUjian = tokenSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
   let tokenListHtml = '<tr><td colspan="3">Pilih ujian dahulu</td></tr>';
   if(tokenSelectedUjian){
-    const tokens = await callServer('getTokenList', tokenSelectedUjian);
+    const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
     tokenListHtml = tokens.map(t=>`<tr><td style="font-family:monospace;font-weight:700">${t.token_code}</td><td><span class="badge ${t.status_dipakai?'gray':'green'}">${t.status_dipakai?'Terpakai':'Belum dipakai'}</span></td><td>${new Date(t.waktu_generate).toLocaleString('id-ID')}</td></tr>`).join('') || '<tr><td colspan="3">Belum ada token</td></tr>';
   }
   return `
@@ -693,6 +795,7 @@ function bindTokenPeserta(){
   document.getElementById('btnGenToken').onclick = async ()=>{
     const jumlah = parseInt(document.getElementById('tk_jumlah').value)||1;
     await callServer('generateToken', tokenSelectedUjian, jumlah);
+    cacheInvalidate('tokenList:'+tokenSelectedUjian);
     toast('Token berhasil dibuat','success'); renderGuru();
   };
 }
@@ -700,7 +803,7 @@ function bindTokenPeserta(){
 // --- Monitoring Live ---
 let monitorSelectedUjian = null, monitorPoll = null;
 async function renderMonitoring(){
-  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
   monitorSelectedUjian = monitorSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
   return `
   <div class="card">
@@ -740,10 +843,11 @@ function bindMonitoring(){
 // --- Hasil Ujian ---
 let hasilSelectedUjian = null;
 async function renderHasilUjian(){
-  const ujianList = await callServer('getUjianList', STATE.user.id_guru);
+  const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
   hasilSelectedUjian = hasilSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
   let rows = '<tr><td colspan="4">Pilih ujian</td></tr>';
   if(hasilSelectedUjian){
+    // Sengaja TIDAK memakai cache di sini — nilai & status harus selalu yang terbaru dari server.
     const hasil = await callServer('getHasilUjian', hasilSelectedUjian);
     rows = hasil.map(h=>`<tr><td>${h.nama_siswa}</td><td>${h.nilai ?? '-'}</td><td>${h.status}</td><td>${h.jumlah_pelanggaran}</td></tr>`).join('') || '<tr><td colspan="4">Belum ada yang mengerjakan</td></tr>';
   }
