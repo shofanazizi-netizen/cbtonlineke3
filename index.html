@@ -96,7 +96,10 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 <div id="toastRoot"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE GOOGLE APPS SCRIPT
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+// WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
+// Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -141,8 +144,22 @@ let PREVIEW_DB = {
 
 function callServer(fnName, ...args){
   if (IS_PREVIEW) return Promise.resolve(PreviewAPI[fnName](...args));
-  return new Promise((resolve, reject) => {
-    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fnName](...args);
+  // PENTING: Sengaja TIDAK mengirim header Content-Type secara eksplisit.
+  // Ini membuat browser memakai "text/plain" (simple request), sehingga TIDAK memicu
+  // CORS preflight (OPTIONS) yang tidak bisa dijawab oleh Apps Script Web App.
+  // Jika Anda menambahkan headers:{'Content-Type':'application/json'} di sini, request AKAN GAGAL karena CORS.
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ fn: fnName, args })
+  })
+  .then(res => res.json())
+  .then(json => {
+    if (json.error) throw new Error(json.error);
+    return json.data;
+  })
+  .catch(err => {
+    toast('Gagal menghubungi server: ' + err.message);
+    throw err;
   });
 }
 
