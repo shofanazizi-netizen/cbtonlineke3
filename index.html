@@ -122,10 +122,10 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 <div id="toastRoot"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -1002,20 +1002,42 @@ let tokenSelectedUjian = null;
 async function renderTokenPeserta(){
   const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
   tokenSelectedUjian = tokenSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
-  let tokenListHtml = '<tr><td colspan="3">Pilih ujian dahulu</td></tr>';
-  if(tokenSelectedUjian){
+  const ujianAktif = ujianList.find(u=>u.id_ujian===tokenSelectedUjian);
+  let tokenListHtml = '<tr><td colspan="4">Pilih ujian dahulu</td></tr>';
+  if(tokenSelectedUjian && ujianAktif){
     const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
-    tokenListHtml = tokens.map(t=>`<tr><td style="font-family:monospace;font-weight:700">${t.token_code}</td><td><span class="badge ${t.status_dipakai?'gray':'green'}">${t.status_dipakai?'Terpakai':'Belum dipakai'}</span></td><td>${new Date(t.waktu_generate).toLocaleString('id-ID')}</td></tr>`).join('') || '<tr><td colspan="3">Belum ada token</td></tr>';
+    tokenListHtml = tokens.map(t=>`<tr>
+      <td style="font-family:monospace;font-weight:700;font-size:15px">${t.token_code}</td>
+      <td><strong>${ujianAktif.nama_ujian}</strong><br><span style="font-size:11px;color:var(--muted)">Kelas ${ujianAktif.kelas} — ${ujianAktif.mapel}</span></td>
+      <td><span class="badge ${t.status_dipakai?'gray':'green'}">${t.status_dipakai?'Terpakai':'Belum dipakai'}</span></td>
+      <td>${new Date(t.waktu_generate).toLocaleString('id-ID')}</td>
+    </tr>`).join('') || '<tr><td colspan="4">Belum ada token</td></tr>';
   }
   return `
   <div class="card">
     <div class="form-row"><label>Pilih Ujian</label>
-      <select id="tk_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===tokenSelectedUjian?'selected':''}>${u.nama_ujian} - ${u.kelas}</option>`).join('')}</select>
+      <select id="tk_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===tokenSelectedUjian?'selected':''}>${u.nama_ujian} — Kelas ${u.kelas}</option>`).join('')}</select>
     </div>
+    ${ujianAktif ? `
+    <div style="background:var(--yellow);border:3px solid var(--black);padding:14px 16px;margin:14px 0">
+      <div style="font-size:11px;font-weight:900;text-transform:uppercase;color:#333">Token di bawah ini HANYA untuk:</div>
+      <div style="font-size:18px;font-weight:900;text-transform:uppercase;margin-top:4px">${ujianAktif.nama_ujian}</div>
+      <div style="font-size:13px;font-weight:700;margin-top:2px">Kelas ${ujianAktif.kelas} &nbsp;|&nbsp; Mapel ${ujianAktif.mapel} &nbsp;|&nbsp; Tanggal ${ujianAktif.tanggal}</div>
+      <div style="font-size:11px;font-weight:700;margin-top:8px;color:#333">⚠️ Pastikan Anda membagikan token ini hanya ke siswa kelas ${ujianAktif.kelas}, bukan kelas lain.</div>
+    </div>` : ''}
     <div class="form-row" style="max-width:150px"><label>Jumlah Token</label><input id="tk_jumlah" type="number" value="5"></div>
     <button class="btn" id="btnGenToken">Generate Token</button>
   </div>
-  <div class="card"><table><thead><tr><th>Token</th><th>Status</th><th>Waktu Dibuat</th></tr></thead><tbody id="tokenListBody">${tokenListHtml}</tbody></table></div>`;
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <h3>Daftar Token</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn ghost small" id="btnCopyToken">Salin Daftar Token</button>
+        <button class="btn ghost small" id="btnExportToken">Unduh Daftar Token (CSV)</button>
+      </div>
+    </div>
+    <table><thead><tr><th>Token</th><th>Untuk Ujian</th><th>Status</th><th>Waktu Dibuat</th></tr></thead><tbody id="tokenListBody">${tokenListHtml}</tbody></table>
+  </div>`;
 }
 function bindTokenPeserta(){
   document.getElementById('tk_ujian').onchange = (e)=>{ tokenSelectedUjian = e.target.value; renderGuru(); };
@@ -1024,6 +1046,32 @@ function bindTokenPeserta(){
     await callServer('generateToken', tokenSelectedUjian, jumlah);
     cacheInvalidate('tokenList:'+tokenSelectedUjian);
     toast('Token berhasil dibuat','success'); renderGuru();
+  };
+  document.getElementById('btnCopyToken').onclick = async ()=>{
+    const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
+    const ujianAktif = ujianList.find(u=>u.id_ujian===tokenSelectedUjian);
+    const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
+    if(!ujianAktif || tokens.length===0){ toast('Belum ada token untuk disalin'); return; }
+    const teks = `TOKEN UJIAN: ${ujianAktif.nama_ujian}\nKelas: ${ujianAktif.kelas} | Mapel: ${ujianAktif.mapel} | Tanggal: ${ujianAktif.tanggal}\n\n` +
+      tokens.map((t,i)=>`${i+1}. ${t.token_code}${t.status_dipakai ? ' (sudah terpakai)' : ''}`).join('\n');
+    try{
+      await navigator.clipboard.writeText(teks);
+      toast('Daftar token disalin ke clipboard','success');
+    }catch(err){ toast('Gagal menyalin, coba lagi'); }
+  };
+  document.getElementById('btnExportToken').onclick = async ()=>{
+    const ujianList = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
+    const ujianAktif = ujianList.find(u=>u.id_ujian===tokenSelectedUjian);
+    const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
+    if(!ujianAktif || tokens.length===0){ toast('Belum ada token untuk diekspor'); return; }
+    let csv = 'Token,Nama Ujian,Kelas,Mapel,Tanggal,Status\n';
+    tokens.forEach(t=>{
+      const row = [t.token_code, ujianAktif.nama_ujian, ujianAktif.kelas, ujianAktif.mapel, ujianAktif.tanggal, t.status_dipakai?'Terpakai':'Belum dipakai']
+        .map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+      csv += row + '\n';
+    });
+    downloadTextFile(`token_${ujianAktif.nama_ujian.replace(/[^a-z0-9]/gi,'_')}.csv`, csv, 'text/csv;charset=utf-8;');
+    toast('Daftar token berhasil diunduh','success');
   };
 }
 
