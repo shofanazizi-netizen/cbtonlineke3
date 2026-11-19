@@ -51,6 +51,35 @@ th{color:#000;font-weight:900;background:var(--yellow);text-transform:uppercase;
 .badge.gray{background:var(--beige);color:#000;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .card h3{font-size:16px;text-transform:uppercase;font-weight:900;letter-spacing:.3px;border-bottom:3px solid var(--yellow);display:inline-block;padding-bottom:4px;}
+/* Kop surat resmi (letterhead) */
+.kop-surat{background:#fff;padding:14px 18px 0;}
+.kop-surat-row{display:flex;align-items:center;gap:16px;}
+.kop-surat-logo{width:64px;height:64px;object-fit:contain;flex-shrink:0;}
+.kop-surat-text{flex:1;min-width:0;}
+.kop-nama-lembaga{font-size:19px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;line-height:1.2;}
+.kop-alamat{font-size:11px;font-weight:600;color:var(--muted);margin-top:2px;}
+.kop-divider-tebal{border-bottom:4px solid var(--black);margin-top:10px;}
+.kop-divider-tipis{border-bottom:1.5px solid var(--black);margin-top:3px;}
+.kop-info-bar{background:var(--yellow);border-top:3px solid var(--black);padding:6px 18px;font-size:11px;font-weight:700;display:flex;flex-wrap:wrap;gap:4px 14px;}
+/* Denah Tempat Duduk */
+.seat-grid{display:grid;gap:10px;margin-top:16px;}
+.seat-box{border:3px solid var(--black);background:#fff;padding:10px 6px;text-align:center;min-height:70px;display:flex;flex-direction:column;justify-content:center;}
+.seat-box.kosong{background:var(--beige);opacity:.6;}
+.seat-box .seat-no{font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;}
+.seat-box .seat-nama{font-size:13px;font-weight:800;margin-top:4px;line-height:1.2;word-break:break-word;}
+/* Kartu cetak tempat duduk: tersembunyi di layar normal, tampil hanya saat print */
+#printSeatCards{display:none;}
+@media print{
+  body > *:not(#printSeatCards){display:none !important;}
+  #printSeatCards{display:block !important; position:static;}
+  .seat-card{break-inside:avoid; page-break-inside:avoid;}
+}
+.print-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:14px;}
+.seat-card{border:3px solid #000;padding:18px;text-align:center;min-height:170px;display:flex;flex-direction:column;justify-content:center;align-items:center;}
+.seat-card .sc-label{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;}
+.seat-card .sc-nomor{font-size:48px;font-weight:900;line-height:1;margin:10px 0;}
+.seat-card .sc-nama{font-size:18px;font-weight:800;text-transform:uppercase;}
+.seat-card .sc-kelas{font-size:12px;font-weight:700;margin-top:6px;color:#555;}
 .form-row{margin-bottom:16px;}
 .form-row label{display:block;font-size:12px;font-weight:900;margin-bottom:6px;color:#000;text-transform:uppercase;letter-spacing:.3px;}
 .form-row input,.form-row select,.form-row textarea{width:100%;padding:11px 12px;border:3px solid var(--black);font-size:14px;background:#fff;}
@@ -125,7 +154,7 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -147,7 +176,7 @@ function nowISO(){ return new Date().toISOString(); }
 let PREVIEW_DB = {
   admin: [{username:'admin', password:'admin2026'}],
   guru: [{id_guru:'g1', nama:'Budi Santoso', mapel:'Matematika', username:'budi', password:'guru123', status_aktif:true,
-    nama_lembaga:'MTs Negeri 1 Contoh', kepala_madrasah:'Drs. H. Ahmad Fauzi, M.Pd.', nama_guru_mapel:'Budi Santoso, S.Pd.', logo_type:'', logo_value:''}],
+    nama_lembaga:'MTs Negeri 1 Contoh', alamat_lembaga:'Jl. Pendidikan No. 17, Kota Contoh', kepala_madrasah:'Drs. H. Ahmad Fauzi, M.Pd.', nama_guru_mapel:'Budi Santoso, S.Pd.', logo_type:'', logo_value:''}],
   siswa: [
     {id_siswa:'s1', nama:'Ani Lestari', kelas:'9A'},
     {id_siswa:'s2', nama:'Rudi Hartono', kelas:'9A'}
@@ -266,7 +295,7 @@ const PreviewAPI = {
   getGuruList(){ return PREVIEW_DB.guru; },
   addGuru(obj){ obj.id_guru = uid('g'); obj.status_aktif = true; PREVIEW_DB.guru.push(obj); return {success:true}; },
   resetPasswordGuru(id_guru, newPassword){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) g.password = newPassword; return {success:true}; },
-  getIdentitas(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru) || {}; return { nama_lembaga:g.nama_lembaga||'', kepala_madrasah:g.kepala_madrasah||'', nama_guru_mapel:g.nama_guru_mapel||'', logo_type:g.logo_type||'', logo_value:g.logo_value||'' }; },
+  getIdentitas(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru) || {}; return { nama_lembaga:g.nama_lembaga||'', alamat_lembaga:g.alamat_lembaga||'', kepala_madrasah:g.kepala_madrasah||'', nama_guru_mapel:g.nama_guru_mapel||'', logo_type:g.logo_type||'', logo_value:g.logo_value||'' }; },
   saveIdentitas(id_guru, data){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) Object.assign(g, data); return {success:true}; },
   toggleGuruStatus(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) g.status_aktif = !g.status_aktif; return {success:true}; },
 
@@ -529,7 +558,7 @@ function shell(navItems, title, contentHtml){
 
 // ---------- ADMIN ----------
 async function renderAdmin(){
-  const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'siswa',label:'Kelola Siswa'},{key:'kelas',label:'Kelola Kelas'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
+  const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'siswa',label:'Kelola Siswa'},{key:'kelas',label:'Kelola Kelas'},{key:'tempatduduk',label:'Tempat Duduk'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
   let html = '';
   if(STATE.view==='dashboard'){
     const guruList = await cachedCall('guruList','getGuruList');
@@ -546,6 +575,8 @@ async function renderAdmin(){
     html = await renderKelolaSiswa();
   } else if(STATE.view==='kelas'){
     html = await renderKelolaKelas();
+  } else if(STATE.view==='tempatduduk'){
+    html = await renderTempatDuduk();
   } else if(STATE.view==='ujian'){
     const list = await cachedCall('allUjianList','getAllUjianList');
     html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Mapel</th><th>Kelas</th><th>Tanggal</th><th>Status</th></tr></thead><tbody>
@@ -564,6 +595,7 @@ async function renderAdmin(){
   if(STATE.view==='guru') bindKelolaGuru();
   if(STATE.view==='siswa') bindKelolaSiswa();
   if(STATE.view==='kelas') bindKelolaKelas();
+  if(STATE.view==='tempatduduk') bindTempatDuduk();
 }
 
 async function renderKelolaKelas(){
@@ -595,6 +627,73 @@ function bindKelolaKelas(){
     const ok = await showConfirmModal({ title:'Hapus Kelas', message:'Hapus kelas ini? Siswa yang sudah memakai nama kelas ini di datanya tidak akan ikut terhapus.', confirmLabel:'Ya, Hapus', danger:true });
     if(ok){ await callServer('deleteKelas', b.dataset.delkelas); cacheInvalidate('kelasList'); toast('Kelas dihapus','success'); renderAdmin(); }
   });
+}
+
+// ---------- TEMPAT DUDUK (Admin) ----------
+let tempatDudukResult = null; // {kelas, cols, seats:[{nomor,nama,baris,kolom}]}
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+async function renderTempatDuduk(){
+  const kelasList = await cachedCall('kelasList','getKelasList');
+  const opsiKelas = kelasList.map(k=>`<option value="${k.nama_kelas}">${k.nama_kelas}</option>`).join('') || '<option value="">Belum ada kelas</option>';
+  let hasilHtml = '';
+  if(tempatDudukResult){
+    hasilHtml = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+        <h3>Denah Kelas ${tempatDudukResult.kelas}</h3>
+        <button class="btn" id="btnCetakKartu">Cetak Kartu Tempat Duduk</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:10px">Denah ini hanya tampilan di layar. Gunakan tombol "Cetak Kartu Tempat Duduk" untuk mencetak kartu per siswa yang bisa digunting dan ditempel di bangku masing-masing.</p>
+      <div class="seat-grid" style="grid-template-columns:repeat(${tempatDudukResult.cols}, 1fr)">
+        ${tempatDudukResult.seats.map(s=>`<div class="seat-box ${s.nama?'':'kosong'}"><div class="seat-no">Kursi ${s.nomor}</div><div class="seat-nama">${s.nama||'(kosong)'}</div></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Buat Denah Tempat Duduk Otomatis</h3>
+    <div class="grid">
+      <div class="form-row"><label>Pilih Kelas</label><select id="td_kelas">${opsiKelas}</select></div>
+      <div class="form-row"><label>Jumlah Kolom (bangku per baris)</label><input id="td_kolom" type="number" value="4" min="1"></div>
+    </div>
+    <div class="form-row"><label style="display:flex;align-items:center;gap:8px;text-transform:none"><input type="checkbox" id="td_acak" checked> Acak urutan tempat duduk (acak posisi antar siswa)</label></div>
+    <button class="btn" id="btnBuatDenah">Buat Denah Otomatis</button>
+  </div>
+  ${hasilHtml}
+  <div id="printSeatCards"></div>`;
+}
+async function bindTempatDuduk(){
+  document.getElementById('btnBuatDenah').onclick = async ()=>{
+    const kelas = document.getElementById('td_kelas').value;
+    const cols = parseInt(document.getElementById('td_kolom').value) || 4;
+    const acak = document.getElementById('td_acak').checked;
+    if(!kelas){ toast('Pilih kelas terlebih dahulu'); return; }
+    const siswaList = await cachedCall('siswaList','getSiswaList');
+    let siswaKelas = siswaList.filter(s=>s.kelas===kelas).map(s=>s.nama);
+    if(siswaKelas.length===0){ toast('Belum ada siswa terdaftar di kelas ini (Kelola Siswa)'); return; }
+    if(acak) siswaKelas = shuffleArray(siswaKelas);
+    const seats = siswaKelas.map((nama,i)=>({ nomor:i+1, nama, baris:Math.floor(i/cols)+1, kolom:(i%cols)+1 }));
+    tempatDudukResult = { kelas, cols, seats };
+    renderAdmin();
+  };
+  const btnCetak = document.getElementById('btnCetakKartu');
+  if(btnCetak){
+    btnCetak.onclick = ()=>{
+      const container = document.getElementById('printSeatCards');
+      container.innerHTML = `<div class="print-cards-grid">${tempatDudukResult.seats.map(s=>`
+        <div class="seat-card">
+          <div class="sc-label">Tempat Duduk</div>
+          <div class="sc-nomor">${s.nomor}</div>
+          <div class="sc-nama">${s.nama}</div>
+          <div class="sc-kelas">Kelas ${tempatDudukResult.kelas}</div>
+        </div>`).join('')}</div>`;
+      window.print();
+    };
+  }
 }
 
 async function renderKelolaGuru(){
@@ -697,6 +796,44 @@ async function renderGuru(){
 
 // --- Buat Ujian (soal langsung melekat ke ujian, tanpa Bank Soal terpisah) ---
 let soalFormType = 'pg';
+let soalGambarPreview = { type:'upload', value:'' }; // gambar soal opsional, direset setiap kali form soal dibuka/selesai disimpan
+
+function renderSoalGambarInputArea(){
+  const area = document.getElementById('soalGambarInputArea');
+  if(!area) return;
+  if(soalGambarPreview.type==='drive'){
+    area.innerHTML = `<input id="sq_gambar_drive" placeholder="Tempel link share Google Drive di sini" value="${soalGambarPreview.value}">`;
+    document.getElementById('sq_gambar_drive').oninput = (e)=>{ soalGambarPreview.value = e.target.value.trim(); updateSoalGambarPreviewArea(); };
+  } else {
+    area.innerHTML = `<input type="file" id="sq_gambar_upload" accept="image/*">`;
+    document.getElementById('sq_gambar_upload').onchange = async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      try{
+        let dataUrl = await resizeImageToDataURL(file, 500, 0.8);
+        if(dataUrl.length > 45000) dataUrl = await resizeImageToDataURL(file, 300, 0.6);
+        if(dataUrl.length > 45000){ toast('Gambar masih terlalu besar, coba gambar lain atau pakai opsi Link Google Drive'); return; }
+        soalGambarPreview.value = dataUrl;
+        updateSoalGambarPreviewArea();
+      } catch(err){ toast('Gagal memproses gambar: ' + err.message); }
+    };
+  }
+}
+function updateSoalGambarPreviewArea(){
+  const area = document.getElementById('soalGambarPreviewArea');
+  if(!area) return;
+  const src = soalGambarPreview.value ? (soalGambarPreview.type==='drive' ? parseGoogleDriveLink(soalGambarPreview.value) : soalGambarPreview.value) : '';
+  area.innerHTML = src
+    ? `<img src="${src}" style="max-width:160px;max-height:160px;border:3px solid var(--black);background:#fff;padding:4px">`
+    : '<span style="font-size:12px;color:var(--muted);font-weight:700">Tidak ada gambar</span>';
+}
+function resetSoalGambarForm(){
+  soalGambarPreview = { type:'upload', value:'' };
+  renderSoalGambarInputArea();
+  updateSoalGambarPreviewArea();
+  const tu = document.getElementById('tabSoalGambarUpload'), td = document.getElementById('tabSoalGambarDrive');
+  if(tu && td){ tu.classList.add('active'); td.classList.remove('active'); }
+}
 let buatUjianEditingId = null; // null = form buat ujian baru; terisi = sedang kelola soal ujian ini
 
 function parseCSVLine(line){
@@ -711,7 +848,7 @@ function parseCSVLine(line){
   return result.map(x=>x.trim());
 }
 function buildSoalFromCSVRow(cols, id_guru, id_ujian){
-  const [tipe_soal, pertanyaan, d1, d2, d3, d4, kunci, bobotStr] = cols;
+  const [tipe_soal, pertanyaan, d1, d2, d3, d4, kunci, bobotStr, gambarUrl] = cols;
   const bobot = parseInt(bobotStr) || 10;
   let data_soal = {}, kunci_jawaban = {};
   if(tipe_soal==='pg'){
@@ -733,7 +870,16 @@ function buildSoalFromCSVRow(cols, id_guru, id_ujian){
   } else {
     return null;
   }
+  if(gambarUrl && gambarUrl.trim()){
+    const tipeGambar = gambarUrl.includes('drive.google.com') ? 'drive' : 'url';
+    data_soal.gambar = { type: tipeGambar, value: gambarUrl.trim() };
+  }
   return { id_guru, id_ujian, tipe_soal, pertanyaan, data_soal, kunci_jawaban, bobot };
+}
+function soalGambarSrc(gambar){
+  if(!gambar || !gambar.value) return '';
+  if(gambar.type==='drive') return parseGoogleDriveLink(gambar.value);
+  return gambar.value; // 'upload' (dataURL) atau 'url' (link langsung) tampil apa adanya
 }
 function downloadTextFile(filename, content, mime){
   const blob = new Blob([content], {type: mime || 'text/plain;charset=utf-8;'});
@@ -800,13 +946,24 @@ async function renderBuatUjian(){
         </select>
       </div>
       <div class="form-row"><label>Pertanyaan</label><textarea id="sq_pertanyaan" rows="2"></textarea></div>
+      <div class="form-row">
+        <label>Gambar Soal (opsional)</label>
+        <div class="role-tabs" style="max-width:360px;margin-bottom:12px">
+          <button id="tabSoalGambarUpload" type="button" class="active">Upload Gambar</button>
+          <button id="tabSoalGambarDrive" type="button">Link Google Drive</button>
+        </div>
+        <div id="soalGambarInputArea"></div>
+        <div id="soalGambarPreviewArea" style="margin-top:10px">
+          <span style="font-size:12px;color:var(--muted);font-weight:700">Tidak ada gambar</span>
+        </div>
+      </div>
       <div id="sq_dynamic"></div>
       <div class="form-row" style="max-width:150px"><label>Bobot Nilai</label><input id="sq_bobot" type="number" value="10"></div>
       <button class="btn" id="btnSimpanSoal">Tambahkan Soal Ini</button>
     </div>
     <div class="card">
       <h3 style="margin-bottom:10px">Impor Soal dari File (CSV atau Excel)</h3>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;font-weight:700">Format kolom: tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot. Untuk PG/PG Kompleks: data1-4=opsi A-D, kunci="a" atau "a|c". Benar/Salah: kosongkan data1-4, kunci="benar"/"salah". Menjodohkan: data1=kiri dipisah "|", data2=kanan dipisah "|" (urutan sama=berpasangan), kunci dikosongkan. Soal langsung masuk ke ujian ini begitu diimpor.</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;font-weight:700">Format kolom: tipe_soal,pertanyaan,data1,data2,data3,data4,kunci,bobot,gambar(opsional). Untuk PG/PG Kompleks: data1-4=opsi A-D, kunci="a" atau "a|c". Benar/Salah: kosongkan data1-4, kunci="benar"/"salah". Menjodohkan: data1=kiri dipisah "|", data2=kanan dipisah "|" (urutan sama=berpasangan), kunci dikosongkan. Kolom terakhir "gambar" opsional: isi dengan link Google Drive atau link gambar langsung kalau soal ini perlu gambar, atau biarkan kosong. Soal langsung masuk ke ujian ini begitu diimpor.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn ghost small" id="btnDownloadTemplateCSV">Unduh Template CSV</button>
         <button class="btn ghost small" id="btnDownloadTemplateXLSX">Unduh Template Excel (.xlsx)</button>
@@ -817,7 +974,7 @@ async function renderBuatUjian(){
     </div>
     <div class="card"><h3 style="margin-bottom:10px">Soal di Ujian Ini (${soalList.length})</h3>
     <table><thead><tr><th>Tipe</th><th>Pertanyaan</th><th>Bobot</th><th>Aksi</th></tr></thead><tbody>
-      ${soalList.map(s=>`<tr><td><span class="badge gray">${labelTipe(s.tipe_soal)}</span></td><td>${s.pertanyaan}</td><td>${s.bobot}</td><td><button class="btn small danger" data-delsoal="${s.id_soal}">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada soal, tambahkan lewat form di atas</td></tr>'}
+      ${soalList.map(s=>`<tr><td><span class="badge gray">${labelTipe(s.tipe_soal)}</span></td><td>${s.pertanyaan}${s.data_soal && s.data_soal.gambar ? ' <span class="badge yellow">🖼 Ada Gambar</span>' : ''}</td><td>${s.bobot}</td><td><button class="btn small danger" data-delsoal="${s.id_soal}">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada soal, tambahkan lewat form di atas</td></tr>'}
     </tbody></table></div>`;
   }
 
@@ -834,6 +991,7 @@ async function renderBuatUjian(){
       <div class="form-row"><label>Tanggal</label><input id="uj_tanggal" type="date"></div>
       <div class="form-row"><label>Durasi (menit)</label><input id="uj_durasi" type="number" value="60"></div>
       <div class="form-row"><label>Batas Pelanggaran (sebelum dikunci)</label><input id="uj_batas" type="number" value="3"></div>
+      <div class="form-row"><label>Nama Pengawas Ujian (opsional)</label><input id="uj_pengawas" placeholder="contoh: Siti Nurhaliza, S.Pd."></div>
     </div>
     <button class="btn" id="btnBuatUjian">Buat Ujian & Lanjut Tambah Soal</button>
   </div>
@@ -850,8 +1008,11 @@ async function renderBuatUjian(){
 async function bindBuatUjian(){
   if(buatUjianEditingId){
     renderSoalDynamicForm(soalFormType);
+    resetSoalGambarForm();
     const tipeSel = document.getElementById('sq_tipe');
     if(tipeSel){ tipeSel.value = soalFormType; tipeSel.onchange = (e)=>{ soalFormType = e.target.value; renderSoalDynamicForm(soalFormType); }; }
+    document.getElementById('tabSoalGambarUpload').onclick = ()=>{ soalGambarPreview = {type:'upload', value:''}; document.getElementById('tabSoalGambarUpload').classList.add('active'); document.getElementById('tabSoalGambarDrive').classList.remove('active'); renderSoalGambarInputArea(); updateSoalGambarPreviewArea(); };
+    document.getElementById('tabSoalGambarDrive').onclick = ()=>{ soalGambarPreview = {type:'drive', value:''}; document.getElementById('tabSoalGambarDrive').classList.add('active'); document.getElementById('tabSoalGambarUpload').classList.remove('active'); renderSoalGambarInputArea(); updateSoalGambarPreviewArea(); };
     document.getElementById('btnKembaliDaftarUjian').onclick = ()=>{ buatUjianEditingId = null; renderGuru(); };
     document.getElementById('btnSimpanSoal').onclick = async ()=>{
       const tipe = document.getElementById('sq_tipe').value;
@@ -876,6 +1037,7 @@ async function bindBuatUjian(){
         data_soal = { kiri, kanan };
         kunci_jawaban = { pasangan };
       }
+      if(soalGambarPreview.value){ data_soal.gambar = { type: soalGambarPreview.type, value: soalGambarPreview.value }; }
       await callServer('saveSoal', { id_guru:STATE.user.id_guru, id_ujian:buatUjianEditingId, tipe_soal:tipe, pertanyaan, data_soal, kunci_jawaban, bobot });
       cacheInvalidate('soalByUjian:'+buatUjianEditingId);
       toast('Soal ditambahkan ke ujian ini','success'); renderGuru();
@@ -886,11 +1048,11 @@ async function bindBuatUjian(){
     });
 
     const TEMPLATE_ROWS = [
-      ['tipe_soal','pertanyaan','data1','data2','data3','data4','kunci','bobot'],
-      ['pg','Berapakah hasil dari 5 + 3?','6','7','8','9','c','10'],
-      ['pg_kompleks','Manakah bilangan genap? (pilih 2)','3','4','7','8','b|d','10'],
-      ['benar_salah','Matahari terbit dari timur','','','','','benar','10'],
-      ['menjodohkan','Jodohkan ibu kota dengan negaranya','Indonesia|Jepang','Jakarta|Tokyo','','','','10']
+      ['tipe_soal','pertanyaan','data1','data2','data3','data4','kunci','bobot','gambar(opsional)'],
+      ['pg','Berapakah hasil dari 5 + 3?','6','7','8','9','c','10',''],
+      ['pg_kompleks','Manakah bilangan genap? (pilih 2)','3','4','7','8','b|d','10',''],
+      ['benar_salah','Perhatikan gambar, ini adalah bangun datar persegi','','','','','benar','10','https://drive.google.com/file/d/CONTOH_ID/view'],
+      ['menjodohkan','Jodohkan ibu kota dengan negaranya','Indonesia|Jepang','Jakarta|Tokyo','','','','10','']
     ];
     document.getElementById('btnDownloadTemplateCSV').onclick = ()=>{
       const csv = TEMPLATE_ROWS.map(r=> r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -908,7 +1070,7 @@ async function bindBuatUjian(){
       const soalArray = [];
       let gagal = 0;
       dataRows.forEach(row=>{
-        const cols = [0,1,2,3,4,5,6,7].map(i => row[i]===undefined || row[i]===null ? '' : String(row[i]).trim());
+        const cols = [0,1,2,3,4,5,6,7,8].map(i => row[i]===undefined || row[i]===null ? '' : String(row[i]).trim());
         if(!cols[0] || !cols[1]){ gagal++; return; }
         const soal = buildSoalFromCSVRow(cols, STATE.user.id_guru, buatUjianEditingId);
         if(soal) soalArray.push(soal); else gagal++;
@@ -957,7 +1119,7 @@ async function bindBuatUjian(){
   document.getElementById('btnBuatUjian').onclick = async ()=>{
     if(!uj_nama.value || !uj_kelas.value || !uj_tanggal.value){ toast('Lengkapi semua data ujian'); return; }
     const res = await callServer('saveUjian', { id_guru:STATE.user.id_guru, nama_ujian:uj_nama.value, mapel:STATE.user.mapel, kelas:uj_kelas.value,
-      tanggal:uj_tanggal.value, durasi_menit:parseInt(uj_durasi.value), batas_pelanggaran:parseInt(uj_batas.value)||3 });
+      tanggal:uj_tanggal.value, durasi_menit:parseInt(uj_durasi.value), batas_pelanggaran:parseInt(uj_batas.value)||3, pengawas:document.getElementById('uj_pengawas').value.trim() });
     cacheInvalidate('ujianList:'+STATE.user.id_guru); cacheInvalidate('allUjianList');
     toast('Ujian dibuat, silakan tambahkan soal','success');
     buatUjianEditingId = res.id_ujian;
@@ -975,13 +1137,14 @@ async function bindBuatUjian(){
         { id:'kelas', label:'Kelas', type:'select', value:u.kelas, options:kelasList.map(k=>k.nama_kelas) },
         { id:'tanggal', label:'Tanggal', type:'date', value:u.tanggal },
         { id:'durasi_menit', label:'Durasi (menit)', type:'number', value:u.durasi_menit },
-        { id:'batas_pelanggaran', label:'Batas Pelanggaran', type:'number', value:u.batas_pelanggaran }
+        { id:'batas_pelanggaran', label:'Batas Pelanggaran', type:'number', value:u.batas_pelanggaran },
+        { id:'pengawas', label:'Nama Pengawas Ujian (opsional)', type:'text', value:u.pengawas||'' }
       ],
       confirmLabel:'Simpan'
     });
     if(hasil){
       await callServer('saveUjian', { id_ujian:u.id_ujian, id_guru:u.id_guru, mapel:u.mapel, status:u.status,
-        nama_ujian:hasil.nama_ujian, kelas:hasil.kelas, tanggal:hasil.tanggal, durasi_menit:parseInt(hasil.durasi_menit), batas_pelanggaran:parseInt(hasil.batas_pelanggaran) });
+        nama_ujian:hasil.nama_ujian, kelas:hasil.kelas, tanggal:hasil.tanggal, durasi_menit:parseInt(hasil.durasi_menit), batas_pelanggaran:parseInt(hasil.batas_pelanggaran), pengawas:hasil.pengawas });
       cacheInvalidate('ujianList:'+STATE.user.id_guru); cacheInvalidate('allUjianList');
       toast('Ujian diperbarui','success'); renderGuru();
     }
@@ -1022,7 +1185,7 @@ async function renderTokenPeserta(){
     <div style="background:var(--yellow);border:3px solid var(--black);padding:14px 16px;margin:14px 0">
       <div style="font-size:11px;font-weight:900;text-transform:uppercase;color:#333">Token di bawah ini HANYA untuk:</div>
       <div style="font-size:18px;font-weight:900;text-transform:uppercase;margin-top:4px">${ujianAktif.nama_ujian}</div>
-      <div style="font-size:13px;font-weight:700;margin-top:2px">Kelas ${ujianAktif.kelas} &nbsp;|&nbsp; Mapel ${ujianAktif.mapel} &nbsp;|&nbsp; Tanggal ${ujianAktif.tanggal}</div>
+      <div style="font-size:13px;font-weight:700;margin-top:2px">Kelas ${ujianAktif.kelas} &nbsp;|&nbsp; Mapel ${ujianAktif.mapel} &nbsp;|&nbsp; Tanggal ${ujianAktif.tanggal}${ujianAktif.pengawas ? ` &nbsp;|&nbsp; Pengawas: ${ujianAktif.pengawas}` : ''}</div>
       <div style="font-size:11px;font-weight:700;margin-top:8px;color:#333">⚠️ Pastikan Anda membagikan token ini hanya ke siswa kelas ${ujianAktif.kelas}, bukan kelas lain.</div>
     </div>` : ''}
     <div class="form-row" style="max-width:150px"><label>Jumlah Token</label><input id="tk_jumlah" type="number" value="5"></div>
@@ -1052,7 +1215,7 @@ function bindTokenPeserta(){
     const ujianAktif = ujianList.find(u=>u.id_ujian===tokenSelectedUjian);
     const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
     if(!ujianAktif || tokens.length===0){ toast('Belum ada token untuk disalin'); return; }
-    const teks = `TOKEN UJIAN: ${ujianAktif.nama_ujian}\nKelas: ${ujianAktif.kelas} | Mapel: ${ujianAktif.mapel} | Tanggal: ${ujianAktif.tanggal}\n\n` +
+    const teks = `TOKEN UJIAN: ${ujianAktif.nama_ujian}\nKelas: ${ujianAktif.kelas} | Mapel: ${ujianAktif.mapel} | Tanggal: ${ujianAktif.tanggal}${ujianAktif.pengawas ? ' | Pengawas: '+ujianAktif.pengawas : ''}\n\n` +
       tokens.map((t,i)=>`${i+1}. ${t.token_code}${t.status_dipakai ? ' (sudah terpakai)' : ''}`).join('\n');
     try{
       await navigator.clipboard.writeText(teks);
@@ -1064,9 +1227,9 @@ function bindTokenPeserta(){
     const ujianAktif = ujianList.find(u=>u.id_ujian===tokenSelectedUjian);
     const tokens = await cachedCall('tokenList:'+tokenSelectedUjian,'getTokenList',[tokenSelectedUjian]);
     if(!ujianAktif || tokens.length===0){ toast('Belum ada token untuk diekspor'); return; }
-    let csv = 'Token,Nama Ujian,Kelas,Mapel,Tanggal,Status\n';
+    let csv = 'Token,Nama Ujian,Kelas,Mapel,Tanggal,Pengawas,Status\n';
     tokens.forEach(t=>{
-      const row = [t.token_code, ujianAktif.nama_ujian, ujianAktif.kelas, ujianAktif.mapel, ujianAktif.tanggal, t.status_dipakai?'Terpakai':'Belum dipakai']
+      const row = [t.token_code, ujianAktif.nama_ujian, ujianAktif.kelas, ujianAktif.mapel, ujianAktif.tanggal, ujianAktif.pengawas||'-', t.status_dipakai?'Terpakai':'Belum dipakai']
         .map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
       csv += row + '\n';
     });
@@ -1166,6 +1329,29 @@ function parseGoogleDriveLink(url){
   if(m && m[1]) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
   return url; // asumsikan sudah berupa link langsung
 }
+function logoSrcFrom(identitas){
+  if(!identitas || !identitas.logo_value) return '';
+  return identitas.logo_type==='drive' ? parseGoogleDriveLink(identitas.logo_value) : identitas.logo_value;
+}
+// Kop surat resmi (letterhead) yang dipakai ulang di: pratinjau identitas, header ujian siswa, layar selesai ujian.
+// infoBarItems: array string opsional, misal ["Kepala Madrasah: X", "Guru Mapel: Y", "Pengawas: Z"]
+function renderKopSuratHTML(identitas, infoBarItems){
+  if(!identitas || !identitas.nama_lembaga) return '';
+  const logoSrc = logoSrcFrom(identitas);
+  return `
+  <div class="kop-surat">
+    <div class="kop-surat-row">
+      ${logoSrc ? `<img src="${logoSrc}" class="kop-surat-logo">` : ''}
+      <div class="kop-surat-text">
+        <div class="kop-nama-lembaga">${identitas.nama_lembaga}</div>
+        ${identitas.alamat_lembaga ? `<div class="kop-alamat">${identitas.alamat_lembaga}</div>` : ''}
+      </div>
+    </div>
+    <div class="kop-divider-tebal"></div>
+    <div class="kop-divider-tipis"></div>
+  </div>
+  ${infoBarItems && infoBarItems.length ? `<div class="kop-info-bar">${infoBarItems.map(t=>`<span>${t}</span>`).join('<span>&nbsp;</span>')}</div>` : ''}`;
+}
 function resizeImageToDataURL(file, maxWidth, quality){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
@@ -1198,6 +1384,7 @@ async function renderIdentitas(){
     <p style="font-size:12px;color:var(--muted);margin-bottom:18px;font-weight:700">Informasi ini akan tampil otomatis di halaman ujian yang dibuka siswa (logo, nama lembaga, kepala madrasah, guru mapel), supaya terlihat resmi dan profesional.</p>
     <div class="grid">
       <div class="form-row"><label>Nama Lembaga / Sekolah</label><input id="id_lembaga" value="${idt.nama_lembaga||''}" placeholder="contoh: MTs Negeri 1 Contoh"></div>
+      <div class="form-row"><label>Alamat Lembaga</label><input id="id_alamat" value="${idt.alamat_lembaga||''}" placeholder="contoh: Jl. Pendidikan No. 17, Kota Contoh"></div>
       <div class="form-row"><label>Nama Kepala Madrasah/Sekolah</label><input id="id_kepsek" value="${idt.kepala_madrasah||''}" placeholder="contoh: Drs. H. Ahmad Fauzi, M.Pd."></div>
       <div class="form-row"><label>Nama Guru Mata Pelajaran</label><input id="id_gurumapel" value="${idt.nama_guru_mapel||STATE.user.nama||''}" placeholder="contoh: Budi Santoso, S.Pd."></div>
     </div>
@@ -1216,13 +1403,11 @@ async function renderIdentitas(){
     <div id="identitasResultBox" style="margin-top:10px;font-size:13px;font-weight:700"></div>
   </div>
   <div class="card">
-    <h3 style="margin-bottom:10px">Pratinjau Kop Ujian</h3>
-    <div style="border:3px solid var(--black);padding:16px;display:flex;align-items:center;gap:14px;background:#fff">
-      ${previewSrc ? `<img src="${previewSrc}" style="width:50px;height:50px;object-fit:contain">` : ''}
-      <div>
-        <div style="font-weight:900;text-transform:uppercase;font-size:15px">${idt.nama_lembaga || 'Nama Lembaga Belum Diisi'}</div>
-        <div style="font-size:12px;font-weight:700;color:var(--muted)">Kepala Madrasah: ${idt.kepala_madrasah || '-'} | Guru Mapel: ${idt.nama_guru_mapel || STATE.user.nama}</div>
-      </div>
+    <h3 style="margin-bottom:10px">Pratinjau Kop Surat Ujian</h3>
+    <div style="border:3px solid var(--black)">
+      ${renderKopSuratHTML({...idt, logo_type:identitasLogoPreview.type, logo_value:identitasLogoPreview.value}, [
+        `Kepala Madrasah: ${idt.kepala_madrasah || '-'}`, `Guru Mapel: ${idt.nama_guru_mapel || STATE.user.nama}`
+      ]) || '<div style="padding:20px;font-size:13px;color:var(--muted);font-weight:700">Isi Nama Lembaga untuk melihat pratinjau kop surat</div>'}
     </div>
   </div>`;
 }
@@ -1266,6 +1451,7 @@ function bindIdentitas(){
   document.getElementById('btnSimpanIdentitas').onclick = async ()=>{
     const data = {
       nama_lembaga: document.getElementById('id_lembaga').value.trim(),
+      alamat_lembaga: document.getElementById('id_alamat').value.trim(),
       kepala_madrasah: document.getElementById('id_kepsek').value.trim(),
       nama_guru_mapel: document.getElementById('id_gurumapel').value.trim(),
       logo_type: identitasLogoPreview.type,
@@ -1375,17 +1561,11 @@ function renderExam(){
   const { ujian, soalList, identitas } = STATE.examData;
   const idx = STATE.currentSoalIndex;
   const soal = soalList[idx];
-  const logoSrc = identitas && identitas.logo_value ? (identitas.logo_type==='drive' ? parseGoogleDriveLink(identitas.logo_value) : identitas.logo_value) : '';
+  const infoBar = [`Kepala Madrasah: ${identitas.kepala_madrasah||'-'}`, `Guru Mapel: ${identitas.nama_guru_mapel||'-'}`];
+  if(ujian.pengawas) infoBar.push(`Pengawas: ${ujian.pengawas}`);
   root.innerHTML = `
   <div class="exam-screen">
-    ${identitas && identitas.nama_lembaga ? `
-    <div style="background:var(--yellow);border-bottom:3px solid var(--black);padding:8px 16px;display:flex;align-items:center;gap:10px">
-      ${logoSrc ? `<img src="${logoSrc}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0">` : ''}
-      <div style="font-size:12px;font-weight:900;text-transform:uppercase;line-height:1.3">
-        ${identitas.nama_lembaga}
-        <div style="font-size:10px;font-weight:700;text-transform:none;color:#333">Kepala Madrasah: ${identitas.kepala_madrasah||'-'} &nbsp;|&nbsp; Guru Mapel: ${identitas.nama_guru_mapel||'-'}</div>
-      </div>
-    </div>` : ''}
+    ${renderKopSuratHTML(identitas, infoBar)}
     <div class="exam-header">
       <div><strong>${ujian.nama_ujian}</strong><div style="font-size:11px;opacity:.8">${STATE.user.nama}</div></div>
       <div class="timer" id="examTimerDisplay">${formatTime(STATE.examSecondsLeft)}</div>
@@ -1396,7 +1576,8 @@ function renderExam(){
       </div>
       <div class="card">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Soal ${idx+1} dari ${soalList.length} — ${labelTipe(soal.tipe_soal)}</div>
-        <div style="font-weight:600;margin-bottom:16px">${soal.pertanyaan}</div>
+        <div style="font-weight:600;margin-bottom:12px">${soal.pertanyaan}</div>
+        ${soal.data_soal && soal.data_soal.gambar ? `<div style="margin-bottom:16px"><img src="${soalGambarSrc(soal.data_soal.gambar)}" style="max-width:100%;max-height:320px;border:3px solid var(--black);background:#fff;padding:4px"></div>` : ''}
         <div id="soalContent"></div>
       </div>
       <div style="display:flex;justify-content:space-between;margin-top:16px">
@@ -1463,13 +1644,14 @@ function finishExamUI(nilai){
   stopExamMonitoring();
   if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
   const identitas = STATE.examData ? STATE.examData.identitas : null;
-  const logoSrc = identitas && identitas.logo_value ? (identitas.logo_type==='drive' ? parseGoogleDriveLink(identitas.logo_value) : identitas.logo_value) : '';
+  const logoSrc = logoSrcFrom(identitas);
   root.innerHTML = `
   <div class="login-wrap"><div class="login-card" style="text-align:center">
     ${identitas && identitas.nama_lembaga ? `
     <div style="margin-bottom:18px">
       ${logoSrc ? `<img src="${logoSrc}" style="width:48px;height:48px;object-fit:contain;margin-bottom:6px">` : ''}
       <div style="font-size:12px;font-weight:900;text-transform:uppercase">${identitas.nama_lembaga}</div>
+      ${identitas.alamat_lembaga ? `<div style="font-size:10px;color:var(--muted);font-weight:600">${identitas.alamat_lembaga}</div>` : ''}
     </div>` : ''}
     <h1 style="color:var(--success)">✓ Ujian Selesai</h1>
     <p class="sub">Terima kasih, jawaban Anda telah dikumpulkan.</p>
