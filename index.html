@@ -149,12 +149,13 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 <body>
 <div id="appRoot"></div>
 <div id="toastRoot"></div>
+<div id="printSeatCards"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -174,7 +175,7 @@ function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9
 function nowISO(){ return new Date().toISOString(); }
 
 let PREVIEW_DB = {
-  admin: [{username:'admin', password:'admin2026'}],
+  admin: [{username:'admin', password:'admin2026', nama_organisasi:'Yayasan Pendidikan Contoh'}],
   guru: [{id_guru:'g1', nama:'Budi Santoso', mapel:'Matematika', username:'budi', password:'guru123', status_aktif:true,
     nama_lembaga:'MTs Negeri 1 Contoh', alamat_lembaga:'Jl. Pendidikan No. 17, Kota Contoh', kepala_madrasah:'Drs. H. Ahmad Fauzi, M.Pd.', nama_guru_mapel:'Budi Santoso, S.Pd.', logo_type:'', logo_value:''}],
   siswa: [
@@ -273,6 +274,8 @@ function callServer(fnName, ...args){
 
 const PreviewAPI = {
   loginAdmin(u,p){ const a = PREVIEW_DB.admin.find(x=>x.username===u && x.password===p); return a? {success:true, data:{username:a.username}} : {success:false, message:'Username atau password salah'}; },
+  getPengaturanOrganisasi(){ return PREVIEW_DB.admin[0] ? (PREVIEW_DB.admin[0].nama_organisasi||'') : ''; },
+  savePengaturanOrganisasi(nama){ if(PREVIEW_DB.admin[0]) PREVIEW_DB.admin[0].nama_organisasi = nama; return {success:true}; },
   loginGuru(u,p){ const g = PREVIEW_DB.guru.find(x=>x.username===u && x.password===p); if(!g) return {success:false, message:'Username atau password salah'}; if(!g.status_aktif) return {success:false, message:'Akun dinonaktifkan oleh admin'}; return {success:true, data:g}; },
   loginSiswaToken(token, nama){
     const t = PREVIEW_DB.token.find(x=>x.token_code===token);
@@ -479,6 +482,7 @@ function renderLogin(){
   <div class="login-wrap">
     <div class="login-card">
       ${IS_PREVIEW ? '<div class="preview-banner" style="margin:-36px -30px 20px;border-radius:18px 18px 0 0;">MODE PREVIEW — Admin: admin/admin2026 | Guru: budi/guru123 | Token Siswa: MTK001</div>':''}
+      ${GLOBAL_ORG_NAME ? `<div style="text-align:center;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;background:var(--yellow);border:2px solid var(--black);padding:4px 8px;margin-bottom:14px">${GLOBAL_ORG_NAME}</div>` : ''}
       <h1>CBT Sekolah</h1>
       <p class="sub">Ujian Berbasis Komputer</p>
       <div class="role-tabs">
@@ -508,7 +512,8 @@ function renderLogin(){
   } else {
     wrap.innerHTML = `
       <div class="form-row"><label>Nomor Token Ujian</label><input id="ltoken" placeholder="Masukkan token dari guru" style="text-transform:uppercase"></div>
-      <div class="form-row"><label>Nama Lengkap</label><input id="lnama" placeholder="Nama sesuai absen"></div>
+      <div class="form-row"><label>Nama Lengkap</label><input id="lnama" list="daftarNamaSiswa" autocomplete="off" placeholder="Nama sesuai absen"></div>
+      <datalist id="daftarNamaSiswa"></datalist>
       <button class="btn" style="width:100%" id="btnLoginSiswa">Mulai Ujian</button>`;
     document.getElementById('btnLoginSiswa').onclick = async ()=>{
       const token = document.getElementById('ltoken').value.trim().toUpperCase();
@@ -519,7 +524,16 @@ function renderLogin(){
       STATE.role='siswa'; STATE.user={nama};
       startExamSession(res.data);
     };
+    loadSiswaAutocomplete();
   }
+}
+async function loadSiswaAutocomplete(){
+  try{
+    const list = await callServer('getSiswaList');
+    const namaUnik = [...new Set(list.map(s=>s.nama))].sort();
+    const dl = document.getElementById('daftarNamaSiswa');
+    if(dl) dl.innerHTML = namaUnik.map(n=>`<option value="${n}">`).join('');
+  }catch(e){ /* diam saja jika gagal, input tetap bisa dipakai manual */ }
 }
 
 function logout(){
@@ -564,10 +578,17 @@ async function renderAdmin(){
     const guruList = await cachedCall('guruList','getGuruList');
     const siswaList = await cachedCall('siswaList','getSiswaList');
     const ujianList = await cachedCall('allUjianList','getAllUjianList');
+    const namaOrg = await cachedCall('pengaturanOrganisasi','getPengaturanOrganisasi');
     html = `<div class="grid">
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Guru</div><div style="font-size:28px;font-weight:800">${guruList.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Siswa</div><div style="font-size:28px;font-weight:800">${siswaList.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Ujian</div><div style="font-size:28px;font-weight:800">${ujianList.length}</div></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-bottom:10px">Nama Organisasi Penyelenggara Ujian</h3>
+      <p style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:14px">Tampil di halaman paling awal (sebelum token/akun dipilih) supaya aplikasi terlihat resmi dan profesional bagi siswa — misalnya nama yayasan, dinas pendidikan, atau nama gabungan sekolah.</p>
+      <div class="form-row" style="max-width:420px"><input id="org_nama" value="${namaOrg||''}" placeholder="contoh: Yayasan Pendidikan Contoh"></div>
+      <button class="btn" id="btnSimpanOrg">Simpan</button>
     </div>`;
   } else if(STATE.view==='guru'){
     html = await renderKelolaGuru();
@@ -592,6 +613,16 @@ async function renderAdmin(){
     html = `<div class="card"><table><thead><tr><th>Ujian</th><th>Siswa</th><th>Nilai</th><th>Status</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Belum ada hasil</td></tr>'}</tbody></table></div>`;
   }
   shell(nav, nav.find(n=>n.key===STATE.view).label, html);
+  if(STATE.view==='dashboard'){
+    const btnOrg = document.getElementById('btnSimpanOrg');
+    if(btnOrg) btnOrg.onclick = async ()=>{
+      const nama = document.getElementById('org_nama').value.trim();
+      await callServer('savePengaturanOrganisasi', nama);
+      cacheInvalidate('pengaturanOrganisasi');
+      GLOBAL_ORG_NAME = nama;
+      toast('Nama organisasi berhasil disimpan','success');
+    };
+  }
   if(STATE.view==='guru') bindKelolaGuru();
   if(STATE.view==='siswa') bindKelolaSiswa();
   if(STATE.view==='kelas') bindKelolaKelas();
@@ -663,8 +694,7 @@ async function renderTempatDuduk(){
     <div class="form-row"><label style="display:flex;align-items:center;gap:8px;text-transform:none"><input type="checkbox" id="td_acak" checked> Acak urutan tempat duduk (acak posisi antar siswa)</label></div>
     <button class="btn" id="btnBuatDenah">Buat Denah Otomatis</button>
   </div>
-  ${hasilHtml}
-  <div id="printSeatCards"></div>`;
+  ${hasilHtml}`;
 }
 async function bindTempatDuduk(){
   document.getElementById('btnBuatDenah').onclick = async ()=>{
@@ -1414,7 +1444,7 @@ function renderKopSuratHTML(identitas, infoBarItems){
   return `
   <div class="kop-surat">
     <div class="kop-surat-row">
-      ${logoSrc ? `<img src="${logoSrc}" class="kop-surat-logo">` : ''}
+      ${logoSrc ? `<img src="${logoSrc}" class="kop-surat-logo" onerror="this.outerHTML='<span style=&quot;font-size:10px;color:#b91c1c;font-weight:700&quot;>⚠️ Gambar logo gagal dimuat (cek link/izin akses)</span>'">` : ''}
       <div class="kop-surat-text">
         <div class="kop-nama-lembaga">${identitas.nama_lembaga}</div>
         ${identitas.alamat_lembaga ? `<div class="kop-alamat">${identitas.alamat_lembaga}</div>` : ''}
@@ -1470,19 +1500,34 @@ async function renderIdentitas(){
       <div id="logoInputArea"></div>
     </div>
     <div id="logoPreviewArea" style="margin:14px 0">
-      ${previewSrc ? `<img src="${previewSrc}" alt="Preview logo" style="max-width:100px;max-height:100px;border:3px solid var(--black);background:#fff;padding:4px">` : '<span style="font-size:12px;color:var(--muted);font-weight:700">Belum ada logo dipilih</span>'}
+      ${previewSrc ? `<img src="${previewSrc}" alt="Preview logo" style="max-width:100px;max-height:100px;border:3px solid var(--black);background:#fff;padding:4px" onerror="this.outerHTML='<span style=&quot;font-size:11px;color:#b91c1c;font-weight:700&quot;>⚠️ Gambar gagal dimuat, cek link/izin akses</span>'">` : '<span style="font-size:12px;color:var(--muted);font-weight:700">Belum ada logo dipilih</span>'}
     </div>
     <button class="btn" id="btnSimpanIdentitas">Simpan Identitas</button>
     <div id="identitasResultBox" style="margin-top:10px;font-size:13px;font-weight:700"></div>
   </div>
   <div class="card">
     <h3 style="margin-bottom:10px">Pratinjau Kop Surat Ujian</h3>
-    <div style="border:3px solid var(--black)">
-      ${renderKopSuratHTML({...idt, logo_type:identitasLogoPreview.type, logo_value:identitasLogoPreview.value}, [
-        `Kepala Madrasah: ${idt.kepala_madrasah || '-'}`, `Guru Mapel: ${idt.nama_guru_mapel || STATE.user.nama}`
-      ]) || '<div style="padding:20px;font-size:13px;color:var(--muted);font-weight:700">Isi Nama Lembaga untuk melihat pratinjau kop surat</div>'}
-    </div>
+    <p style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:10px">Pratinjau ini otomatis diperbarui saat Anda mengganti logo atau mengetik di kolom-kolom di atas (sebelum disimpan sekalipun).</p>
+    <div id="kopSuratPreviewArea" style="border:3px solid var(--black)"></div>
   </div>`;
+}
+function readIdentitasFormValues(){
+  return {
+    nama_lembaga: (document.getElementById('id_lembaga')||{}).value?.trim() || '',
+    alamat_lembaga: (document.getElementById('id_alamat')||{}).value?.trim() || '',
+    kepala_madrasah: (document.getElementById('id_kepsek')||{}).value?.trim() || '',
+    nama_guru_mapel: (document.getElementById('id_gurumapel')||{}).value?.trim() || STATE.user.nama || ''
+  };
+}
+function refreshKopSuratPreview(){
+  const el = document.getElementById('kopSuratPreviewArea');
+  if(!el) return;
+  const vals = readIdentitasFormValues();
+  const html = renderKopSuratHTML(
+    { ...vals, logo_type: identitasLogoPreview.type, logo_value: identitasLogoPreview.value },
+    [`Kepala Madrasah: ${vals.kepala_madrasah || '-'}`, `Guru Mapel: ${vals.nama_guru_mapel}`]
+  );
+  el.innerHTML = html || '<div style="padding:20px;font-size:13px;color:var(--muted);font-weight:700">Isi Nama Lembaga untuk melihat pratinjau kop surat</div>';
 }
 
 function renderLogoInputArea(){
@@ -1513,12 +1558,18 @@ function renderLogoInputArea(){
 function updateLogoPreviewArea(){
   const previewSrc = identitasLogoPreview.value ? (identitasLogoPreview.type==='drive' ? parseGoogleDriveLink(identitasLogoPreview.value) : identitasLogoPreview.value) : '';
   document.getElementById('logoPreviewArea').innerHTML = previewSrc
-    ? `<img src="${previewSrc}" alt="Preview logo" style="max-width:100px;max-height:100px;border:3px solid var(--black);background:#fff;padding:4px">`
+    ? `<img src="${previewSrc}" alt="Preview logo" style="max-width:100px;max-height:100px;border:3px solid var(--black);background:#fff;padding:4px" onerror="this.outerHTML='<span style=&quot;font-size:11px;color:#b91c1c;font-weight:700&quot;>⚠️ Gambar gagal dimuat, cek link/izin akses</span>'">`
     : '<span style="font-size:12px;color:var(--muted);font-weight:700">Belum ada logo dipilih</span>';
+  refreshKopSuratPreview();
 }
 
 function bindIdentitas(){
   renderLogoInputArea();
+  refreshKopSuratPreview();
+  ['id_lembaga','id_alamat','id_kepsek','id_gurumapel'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.oninput = refreshKopSuratPreview;
+  });
   document.getElementById('tabLogoUpload').onclick = ()=>{ identitasLogoPreview = {type:'upload', value:''}; document.getElementById('tabLogoUpload').classList.add('active'); document.getElementById('tabLogoDrive').classList.remove('active'); renderLogoInputArea(); updateLogoPreviewArea(); };
   document.getElementById('tabLogoDrive').onclick = ()=>{ identitasLogoPreview = {type:'drive', value:''}; document.getElementById('tabLogoDrive').classList.add('active'); document.getElementById('tabLogoUpload').classList.remove('active'); renderLogoInputArea(); updateLogoPreviewArea(); };
   document.getElementById('btnSimpanIdentitas').onclick = async ()=>{
@@ -1752,7 +1803,11 @@ function finishExamUI(nilai){
 }
 
 // ====================== START APP ======================
-render();
+let GLOBAL_ORG_NAME = '';
+(async function initApp(){
+  try{ GLOBAL_ORG_NAME = await callServer('getPengaturanOrganisasi'); }catch(e){ /* biarkan kosong jika gagal, tidak menghalangi aplikasi jalan */ }
+  render();
+})();
 </script>
 </body>
 </html>
