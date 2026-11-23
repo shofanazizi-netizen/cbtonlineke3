@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>MTS. NASYIATUS SYUBBAN</title>
+<title>CBT Sekolah</title>
 <link rel="manifest" id="pwaManifest">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <meta name="theme-color" content="#1e40af">
@@ -152,10 +152,10 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 <div id="printSeatCards"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -183,6 +183,7 @@ let PREVIEW_DB = {
     {id_siswa:'s2', nama:'Rudi Hartono', kelas:'9A'}
   ],
   kelas: [ {id_kelas:'k1', nama_kelas:'9A'}, {id_kelas:'k2', nama_kelas:'9B'} ],
+  pengawas: [ {id_pengawas:'p1', nama:'Siti Nurhaliza, S.Pd.', username:'siti', password:'pengawas123', status_aktif:true} ],
   bankSoal: [
     {id_soal:'q1', id_guru:'g1', id_ujian:'u1', tipe_soal:'pg', pertanyaan:'Berapakah hasil dari 12 x 8?',
       data_soal:{opsi:[{k:'a',v:'86'},{k:'b',v:'96'},{k:'c',v:'106'},{k:'d',v:'88'}]}, kunci_jawaban:{benar:'b'}, bobot:10},
@@ -231,13 +232,17 @@ async function prefetchAllData(){
       cachedCall('guruList','getGuruList'),
       cachedCall('siswaList','getSiswaList'),
       cachedCall('kelasList','getKelasList'),
+      cachedCall('pengawasList','getPengawasList'),
       cachedCall('allUjianList','getAllUjianList')
     ]);
   } else if(STATE.role==='guru'){
     await Promise.all([
       cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]),
-      cachedCall('kelasList','getKelasList')
+      cachedCall('kelasList','getKelasList'),
+      cachedCall('pengawasList','getPengawasList')
     ]);
+  } else if(STATE.role==='pengawas'){
+    await cachedCall('ujianByPengawas:'+STATE.user.id_pengawas,'getUjianByPengawas',[STATE.user.id_pengawas]);
   }
 }
 function startAutoRefresh(){
@@ -301,6 +306,12 @@ const PreviewAPI = {
   getIdentitas(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru) || {}; return { nama_lembaga:g.nama_lembaga||'', alamat_lembaga:g.alamat_lembaga||'', kepala_madrasah:g.kepala_madrasah||'', nama_guru_mapel:g.nama_guru_mapel||'', logo_type:g.logo_type||'', logo_value:g.logo_value||'' }; },
   saveIdentitas(id_guru, data){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) Object.assign(g, data); return {success:true}; },
   toggleGuruStatus(id_guru){ const g = PREVIEW_DB.guru.find(x=>x.id_guru===id_guru); if(g) g.status_aktif = !g.status_aktif; return {success:true}; },
+  loginPengawas(u,p){ const x = PREVIEW_DB.pengawas.find(a=>a.username===u && a.password===p); if(!x) return {success:false, message:'Username atau password salah'}; if(!x.status_aktif) return {success:false, message:'Akun dinonaktifkan oleh admin'}; return {success:true, data:x}; },
+  getPengawasList(){ return PREVIEW_DB.pengawas; },
+  addPengawas(obj){ obj.id_pengawas = uid('p'); obj.status_aktif = true; PREVIEW_DB.pengawas.push(obj); return {success:true}; },
+  resetPasswordPengawas(id_pengawas, newPassword){ const x = PREVIEW_DB.pengawas.find(a=>a.id_pengawas===id_pengawas); if(x) x.password = newPassword; return {success:true}; },
+  togglePengawasStatus(id_pengawas){ const x = PREVIEW_DB.pengawas.find(a=>a.id_pengawas===id_pengawas); if(x) x.status_aktif = !x.status_aktif; return {success:true}; },
+  getUjianByPengawas(id_pengawas){ return PREVIEW_DB.ujian.filter(u=>u.id_pengawas===id_pengawas); },
 
   getSiswaList(){ return PREVIEW_DB.siswa; },
   addSiswaBulk(list){ list.forEach(s=>{ PREVIEW_DB.siswa.push({id_siswa:uid('s'), nama:s.nama, kelas:s.kelas}); }); return {success:true}; },
@@ -435,7 +446,12 @@ function showFormModal({title='Edit Data', fields=[], confirmLabel='Simpan', can
     overlay.className = 'modal-overlay';
     const fieldsHtml = fields.map(f=>{
       if(f.type==='select'){
-        return `<div class="form-row"><label>${f.label}</label><select id="modalField_${f.id}">${(f.options||[]).map(o=>`<option value="${o}" ${o===f.value?'selected':''}>${o}</option>`).join('')}</select></div>`;
+        // options bisa berupa array string (value=label=string itu sendiri) atau array {value,label} kalau value & teks tampil beda
+        return `<div class="form-row"><label>${f.label}</label><select id="modalField_${f.id}">${(f.options||[]).map(o=>{
+          const val = (o && typeof o==='object') ? o.value : o;
+          const lbl = (o && typeof o==='object') ? o.label : o;
+          return `<option value="${val}" ${val===f.value?'selected':''}>${lbl}</option>`;
+        }).join('')}</select></div>`;
       }
       return `<div class="form-row"><label>${f.label}</label><input type="${f.type||'text'}" id="modalField_${f.id}" value="${f.value!==undefined?f.value:''}"></div>`;
     }).join('');
@@ -473,6 +489,7 @@ function render(){
   if(STATE.role==='siswa' && STATE.examData){ renderExam(); return; }
   if(STATE.role==='admin') renderAdmin();
   else if(STATE.role==='guru') renderGuru();
+  else if(STATE.role==='pengawas') renderPengawas();
 }
 
 // ---------- LOGIN ----------
@@ -481,12 +498,12 @@ function renderLogin(){
   root.innerHTML = `
   <div class="login-wrap">
     <div class="login-card">
-      ${IS_PREVIEW ? '<div class="preview-banner" style="margin:-36px -30px 20px;border-radius:18px 18px 0 0;">MODE PREVIEW — Admin: admin/admin2026 | Guru: budi/guru123 | Token Siswa: MTK001</div>':''}
+      ${IS_PREVIEW ? '<div class="preview-banner" style="margin:-36px -30px 20px;border-radius:18px 18px 0 0;">MODE PREVIEW — Admin: admin/admin2026 | Guru: budi/guru123 | Pengawas: siti/pengawas123 | Token Siswa: MTK001</div>':''}
       ${GLOBAL_ORG_NAME ? `<div style="text-align:center;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;background:var(--yellow);border:2px solid var(--black);padding:4px 8px;margin-bottom:14px">${GLOBAL_ORG_NAME}</div>` : ''}
       <h1>CBT Sekolah</h1>
       <p class="sub">Ujian Berbasis Komputer</p>
       <div class="role-tabs">
-        <button id="tabGuru" class="${loginTab==='guru'?'active':''}">Guru/Admin</button>
+        <button id="tabGuru" class="${loginTab==='guru'?'active':''}">Petugas</button>
         <button id="tabSiswa" class="${loginTab==='siswa'?'active':''}">Siswa</button>
       </div>
       <div id="errBox"></div>
@@ -498,7 +515,8 @@ function renderLogin(){
   const wrap = document.getElementById('loginFormWrap');
   if(loginTab==='guru'){
     wrap.innerHTML = `
-      <div class="form-row"><label>Username</label><input id="lu" placeholder="Username Admin / Guru"></div>
+      <p class="sub" style="margin-bottom:14px">Untuk Admin, Guru, atau Pengawas Ujian</p>
+      <div class="form-row"><label>Username</label><input id="lu" placeholder="Username"></div>
       <div class="form-row"><label>Password</label><input id="lp" type="password" placeholder="Password"></div>
       <button class="btn" style="width:100%" id="btnLoginGuru">Masuk</button>`;
     document.getElementById('btnLoginGuru').onclick = async ()=>{
@@ -507,6 +525,8 @@ function renderLogin(){
       if(res.success){ STATE.role='admin'; STATE.user=res.data; await prefetchAllData(); startAutoRefresh(); render(); return; }
       res = await callServer('loginGuru', u, p);
       if(res.success){ STATE.role='guru'; STATE.user=res.data; await prefetchAllData(); startAutoRefresh(); render(); return; }
+      res = await callServer('loginPengawas', u, p);
+      if(res.success){ STATE.role='pengawas'; STATE.user=res.data; await prefetchAllData(); startAutoRefresh(); render(); return; }
       document.getElementById('errBox').innerHTML = `<div class="error-msg">${res.message||'Login gagal'}</div>`;
     };
   } else {
@@ -539,6 +559,8 @@ async function loadSiswaAutocomplete(){
 function logout(){
   if(STATE.examTimer) clearInterval(STATE.examTimer);
   if(STATE.lockPollTimer) clearInterval(STATE.lockPollTimer);
+  if(pengawasMonitorPoll) clearInterval(pengawasMonitorPoll);
+  if(monitorPoll) clearInterval(monitorPoll);
   stopAutoRefresh();
   AppCache = {};
   STATE = { role:null, user:null, view:'dashboard', examData:null, examAnswers:{}, examTimer:null, examSecondsLeft:0, lockPollTimer:null, cheatCount:0 };
@@ -572,16 +594,18 @@ function shell(navItems, title, contentHtml){
 
 // ---------- ADMIN ----------
 async function renderAdmin(){
-  const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'siswa',label:'Kelola Siswa'},{key:'kelas',label:'Kelola Kelas'},{key:'tempatduduk',label:'Tempat Duduk'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
+  const nav = [{key:'dashboard',label:'Dashboard'},{key:'guru',label:'Kelola Guru'},{key:'pengawas',label:'Kelola Pengawas'},{key:'siswa',label:'Kelola Siswa'},{key:'kelas',label:'Kelola Kelas'},{key:'tempatduduk',label:'Tempat Duduk'},{key:'ujian',label:'Semua Ujian'},{key:'rekap',label:'Rekap Nilai'}];
   let html = '';
   if(STATE.view==='dashboard'){
     const guruList = await cachedCall('guruList','getGuruList');
     const siswaList = await cachedCall('siswaList','getSiswaList');
     const ujianList = await cachedCall('allUjianList','getAllUjianList');
+    const pengawasList = await cachedCall('pengawasList','getPengawasList');
     const namaOrg = await cachedCall('pengaturanOrganisasi','getPengaturanOrganisasi');
     html = `<div class="grid">
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Guru</div><div style="font-size:28px;font-weight:800">${guruList.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Siswa</div><div style="font-size:28px;font-weight:800">${siswaList.length}</div></div>
+      <div class="card"><div style="color:var(--muted);font-size:13px">Total Pengawas</div><div style="font-size:28px;font-weight:800">${pengawasList.length}</div></div>
       <div class="card"><div style="color:var(--muted);font-size:13px">Total Ujian</div><div style="font-size:28px;font-weight:800">${ujianList.length}</div></div>
     </div>
     <div class="card">
@@ -592,6 +616,8 @@ async function renderAdmin(){
     </div>`;
   } else if(STATE.view==='guru'){
     html = await renderKelolaGuru();
+  } else if(STATE.view==='pengawas'){
+    html = await renderKelolaPengawas();
   } else if(STATE.view==='siswa'){
     html = await renderKelolaSiswa();
   } else if(STATE.view==='kelas'){
@@ -624,6 +650,7 @@ async function renderAdmin(){
     };
   }
   if(STATE.view==='guru') bindKelolaGuru();
+  if(STATE.view==='pengawas') bindKelolaPengawas();
   if(STATE.view==='siswa') bindKelolaSiswa();
   if(STATE.view==='kelas') bindKelolaKelas();
   if(STATE.view==='tempatduduk') bindTempatDuduk();
@@ -756,6 +783,36 @@ function bindKelolaGuru(){
     if(np){ await callServer('resetPasswordGuru', b.dataset.reset, np); cacheInvalidate('guruList'); toast('Password berhasil direset','success'); }
   });
   document.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = async ()=>{ await callServer('toggleGuruStatus', b.dataset.toggle); cacheInvalidate('guruList'); renderAdmin(); });
+}
+
+async function renderKelolaPengawas(){
+  const list = await cachedCall('pengawasList','getPengawasList');
+  return `
+  <div class="card">
+    <h3 style="margin-bottom:14px">Tambah Akun Pengawas Ujian</h3>
+    <div class="grid">
+      <div class="form-row"><label>Nama</label><input id="np_nama"></div>
+      <div class="form-row"><label>Username</label><input id="np_username"></div>
+      <div class="form-row"><label>Password</label><input id="np_password"></div>
+    </div>
+    <button class="btn" id="btnAddPengawas">Tambah Pengawas</button>
+  </div>
+  <div class="card"><table><thead><tr><th>Nama</th><th>Username</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+    ${list.map(p=>`<tr><td>${p.nama}</td><td>${p.username}</td><td><span class="badge ${p.status_aktif?'green':'red'}">${p.status_aktif?'Aktif':'Nonaktif'}</span></td>
+      <td><button class="btn small ghost" data-resetpengawas="${p.id_pengawas}">Reset Password</button> <button class="btn small danger" data-togglepengawas="${p.id_pengawas}">${p.status_aktif?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada akun pengawas</td></tr>'}
+  </tbody></table></div>`;
+}
+function bindKelolaPengawas(){
+  document.getElementById('btnAddPengawas').onclick = async ()=>{
+    const obj = { nama:np_nama.value.trim(), username:np_username.value.trim(), password:np_password.value };
+    if(!obj.nama||!obj.username||!obj.password){ toast('Lengkapi semua kolom'); return; }
+    await callServer('addPengawas', obj); cacheInvalidate('pengawasList'); toast('Akun pengawas ditambahkan','success'); renderAdmin();
+  };
+  document.querySelectorAll('[data-resetpengawas]').forEach(b=> b.onclick = async ()=>{
+    const np = await showPromptModal({ title:'Reset Password Pengawas', message:'Masukkan password baru untuk akun ini:', placeholder:'Password baru' });
+    if(np){ await callServer('resetPasswordPengawas', b.dataset.resetpengawas, np); cacheInvalidate('pengawasList'); toast('Password berhasil direset','success'); }
+  });
+  document.querySelectorAll('[data-togglepengawas]').forEach(b=> b.onclick = async ()=>{ await callServer('togglePengawasStatus', b.dataset.togglepengawas); cacheInvalidate('pengawasList'); renderAdmin(); });
 }
 
 async function renderKelolaSiswa(){
@@ -1081,6 +1138,10 @@ async function renderBuatUjian(){
 
   // ---- MODE: Daftar Ujian + Form Buat Ujian Baru ----
   const list = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
+  const pengawasList = await cachedCall('pengawasList','getPengawasList');
+  const opsiPengawas = ['<option value="">— tidak ditugaskan —</option>'].concat(
+    pengawasList.filter(p=>p.status_aktif).map(p=>`<option value="${p.id_pengawas}" data-nama="${p.nama}">${p.nama} (${p.username})</option>`)
+  ).join('');
   const jumlahSoalPerUjian = {};
   await Promise.all(list.map(async u=>{ const s = await cachedCall('soalByUjian:'+u.id_ujian,'getSoalByUjian',[u.id_ujian]); jumlahSoalPerUjian[u.id_ujian] = s.length; }));
   return `
@@ -1093,7 +1154,10 @@ async function renderBuatUjian(){
       <div class="form-row"><label>Jam Mulai (opsional)</label><input id="uj_jam" type="time"></div>
       <div class="form-row"><label>Durasi (menit)</label><input id="uj_durasi" type="number" value="60"></div>
       <div class="form-row"><label>Batas Pelanggaran (sebelum dikunci)</label><input id="uj_batas" type="number" value="3"></div>
-      <div class="form-row"><label>Nama Pengawas Ujian (opsional)</label><input id="uj_pengawas" placeholder="contoh: Siti Nurhaliza, S.Pd."></div>
+      <div class="form-row"><label>Tugaskan Akun Pengawas (opsional)</label><select id="uj_id_pengawas">${opsiPengawas}</select>
+        <p style="font-size:11px;color:var(--muted);font-weight:700;margin-top:6px">Kalau dipilih, akun pengawas tersebut bisa login sendiri dan memantau ujian ini di menu Monitoring-nya. Memilih di sini otomatis mengisi nama di kolom bawah.</p>
+      </div>
+      <div class="form-row"><label>Nama Pengawas Ujian (tampil di kop surat, opsional)</label><input id="uj_pengawas" placeholder="contoh: Siti Nurhaliza, S.Pd."></div>
     </div>
     <button class="btn" id="btnBuatUjian">Buat Ujian & Lanjut Tambah Soal</button>
   </div>
@@ -1218,11 +1282,18 @@ async function bindBuatUjian(){
   }
 
   // ---- Binding untuk mode daftar ujian ----
+  const selPengawasBaru = document.getElementById('uj_id_pengawas');
+  if(selPengawasBaru) selPengawasBaru.onchange = (e)=>{
+    const opt = e.target.selectedOptions[0];
+    if(opt && opt.dataset.nama) document.getElementById('uj_pengawas').value = opt.dataset.nama;
+  };
   document.getElementById('btnBuatUjian').onclick = async ()=>{
     if(!uj_nama.value || !uj_kelas.value || !uj_tanggal.value){ toast('Lengkapi semua data ujian'); return; }
     const res = await callServer('saveUjian', { id_guru:STATE.user.id_guru, nama_ujian:uj_nama.value, mapel:STATE.user.mapel, kelas:uj_kelas.value,
-      tanggal:uj_tanggal.value, jam_mulai:document.getElementById('uj_jam').value, durasi_menit:parseInt(uj_durasi.value), batas_pelanggaran:parseInt(uj_batas.value)||3, pengawas:document.getElementById('uj_pengawas').value.trim() });
+      tanggal:uj_tanggal.value, jam_mulai:document.getElementById('uj_jam').value, durasi_menit:parseInt(uj_durasi.value), batas_pelanggaran:parseInt(uj_batas.value)||3,
+      pengawas:document.getElementById('uj_pengawas').value.trim(), id_pengawas:document.getElementById('uj_id_pengawas').value });
     cacheInvalidate('ujianList:'+STATE.user.id_guru); cacheInvalidate('allUjianList');
+    if(document.getElementById('uj_id_pengawas').value) cacheInvalidate('ujianByPengawas:'+document.getElementById('uj_id_pengawas').value);
     toast('Ujian dibuat, silakan tambahkan soal','success');
     buatUjianEditingId = res.id_ujian;
     renderGuru();
@@ -1232,6 +1303,7 @@ async function bindBuatUjian(){
     const list = await cachedCall('ujianList:'+STATE.user.id_guru,'getUjianList',[STATE.user.id_guru]);
     const u = list.find(x=>x.id_ujian===b.dataset.editujian);
     const kelasList = await cachedCall('kelasList','getKelasList');
+    const pengawasListEdit = await cachedCall('pengawasList','getPengawasList');
     const hasil = await showFormModal({
       title: 'Edit Ujian',
       fields: [
@@ -1241,13 +1313,18 @@ async function bindBuatUjian(){
         { id:'jam_mulai', label:'Jam Mulai (opsional)', type:'time', value:u.jam_mulai||'' },
         { id:'durasi_menit', label:'Durasi (menit)', type:'number', value:u.durasi_menit },
         { id:'batas_pelanggaran', label:'Batas Pelanggaran', type:'number', value:u.batas_pelanggaran },
-        { id:'pengawas', label:'Nama Pengawas Ujian (opsional)', type:'text', value:u.pengawas||'' }
+        { id:'id_pengawas', label:'Akun Pengawas Bertugas (opsional)', type:'select', value:u.id_pengawas||'',
+          options:[{value:'',label:'— tidak ditugaskan —'}].concat(pengawasListEdit.filter(p=>p.status_aktif).map(p=>({value:p.id_pengawas, label:`${p.nama} (${p.username})`}))) },
+        { id:'pengawas', label:'Nama Pengawas Ujian (tampil di kop surat, opsional)', type:'text', value:u.pengawas||'' }
       ],
       confirmLabel:'Simpan'
     });
     if(hasil){
+      const idPengawasLama = u.id_pengawas;
       await callServer('saveUjian', { id_ujian:u.id_ujian, id_guru:u.id_guru, mapel:u.mapel, status:u.status,
-        nama_ujian:hasil.nama_ujian, kelas:hasil.kelas, tanggal:hasil.tanggal, jam_mulai:hasil.jam_mulai, durasi_menit:parseInt(hasil.durasi_menit), batas_pelanggaran:parseInt(hasil.batas_pelanggaran), pengawas:hasil.pengawas });
+        nama_ujian:hasil.nama_ujian, kelas:hasil.kelas, tanggal:hasil.tanggal, jam_mulai:hasil.jam_mulai, durasi_menit:parseInt(hasil.durasi_menit), batas_pelanggaran:parseInt(hasil.batas_pelanggaran), pengawas:hasil.pengawas, id_pengawas:hasil.id_pengawas });
+      if(idPengawasLama) cacheInvalidate('ujianByPengawas:'+idPengawasLama);
+      if(hasil.id_pengawas) cacheInvalidate('ujianByPengawas:'+hasil.id_pengawas);
       cacheInvalidate('ujianList:'+STATE.user.id_guru); cacheInvalidate('allUjianList');
       toast('Ujian diperbarui','success'); renderGuru();
     }
@@ -1382,6 +1459,66 @@ function bindMonitoring(){
   refreshMonitor();
   if(monitorPoll) clearInterval(monitorPoll);
   monitorPoll = setInterval(refreshMonitor, 4000);
+}
+
+// ====================== DASHBOARD PENGAWAS UJIAN (role baru, terpisah dari Guru/Admin) ======================
+let pengawasSelectedUjian = null, pengawasMonitorPoll = null;
+async function renderPengawas(){
+  const nav = [{key:'monitoring', label:'Monitoring Ujian'}];
+  STATE.view = 'monitoring';
+  const html = await renderPengawasMonitoring();
+  shell(nav, 'Monitoring Ujian', html);
+  bindPengawasMonitoring();
+}
+async function renderPengawasMonitoring(){
+  const ujianList = await cachedCall('ujianByPengawas:'+STATE.user.id_pengawas,'getUjianByPengawas',[STATE.user.id_pengawas]);
+  pengawasSelectedUjian = pengawasSelectedUjian || (ujianList[0] && ujianList[0].id_ujian);
+  const ujianAktif = ujianList.find(u=>u.id_ujian===pengawasSelectedUjian);
+  if(ujianList.length===0){
+    return `<div class="card"><p style="font-size:13px;font-weight:700;color:var(--muted)">Belum ada ujian yang ditugaskan kepada Anda. Minta guru untuk memilih akun Anda di kolom "Tugaskan Akun Pengawas" saat membuat/mengedit ujian.</p></div>`;
+  }
+  return `
+  <div class="card">
+    <div class="form-row"><label>Pilih Ujian yang Ditugaskan ke Anda</label>
+      <select id="pw_ujian">${ujianList.map(u=>`<option value="${u.id_ujian}" ${u.id_ujian===pengawasSelectedUjian?'selected':''}>${u.nama_ujian} — Kelas ${u.kelas}</option>`).join('')}</select>
+    </div>
+    ${ujianAktif ? `<div style="background:var(--yellow);border:3px solid var(--black);padding:12px 16px;margin-top:10px">
+      <div style="font-size:16px;font-weight:900;text-transform:uppercase">${ujianAktif.nama_ujian}</div>
+      <div style="font-size:12px;font-weight:700;margin-top:2px">Kelas ${ujianAktif.kelas} &nbsp;|&nbsp; Mapel ${ujianAktif.mapel} &nbsp;|&nbsp; Tanggal ${ujianAktif.tanggal}${ujianAktif.jam_mulai?' '+ujianAktif.jam_mulai:''}</div>
+    </div>` : ''}
+  </div>
+  <div class="card"><table><thead><tr><th>Siswa</th><th>Status</th><th>Pelanggaran</th><th>Aksi</th></tr></thead><tbody id="monitorBodyPengawas"><tr><td colspan="4">Memuat...</td></tr></tbody></table></div>`;
+}
+async function refreshPengawasMonitor(){
+  if(!pengawasSelectedUjian) return;
+  const data = await callServer('getMonitoring', pengawasSelectedUjian);
+  const body = document.getElementById('monitorBodyPengawas');
+  if(!body) return;
+  body.innerHTML = data.map(h=>{
+    let badge = 'green';
+    if(h.jumlah_pelanggaran>=3 || h.status==='terkunci_menunggu_persetujuan') badge='red';
+    else if(h.jumlah_pelanggaran>=1) badge='yellow';
+    if(h.status==='selesai') badge='gray';
+    let statusLabel = h.status==='dikerjakan'?'Mengerjakan': h.status==='selesai'?'Selesai': h.status==='terkunci_menunggu_persetujuan'?'MENUNGGU PERSETUJUAN':h.status;
+    let aksi = '-';
+    if(h.status==='terkunci_menunggu_persetujuan'){
+      aksi = `<button class="btn small success" data-approvepw="${h.id_hasil}">Izinkan Lanjut</button> <button class="btn small danger" data-forcesubmitpw="${h.id_hasil}">Paksa Submit</button>`;
+    }
+    return `<tr><td>${h.nama_siswa}</td><td><span class="badge ${badge}">${statusLabel}</span></td><td>${h.jumlah_pelanggaran}</td><td>${aksi}</td></tr>`;
+  }).join('') || '<tr><td colspan="4">Belum ada peserta mengerjakan</td></tr>';
+  document.querySelectorAll('[data-approvepw]').forEach(b=> b.onclick = async ()=>{ await callServer('approveSiswa', b.dataset.approvepw); toast('Siswa diizinkan melanjutkan','success'); refreshPengawasMonitor(); });
+  document.querySelectorAll('[data-forcesubmitpw]').forEach(b=> b.onclick = async ()=>{
+    const ok = await showConfirmModal({ title:'Paksa Submit', message:'Paksa submit jawaban siswa ini sekarang? Jawaban yang sudah ada akan langsung dinilai.', confirmLabel:'Ya, Paksa Submit', danger:true });
+    if(ok){ await callServer('forceSubmitSiswa', b.dataset.forcesubmitpw); toast('Ujian siswa dipaksa submit','success'); refreshPengawasMonitor(); }
+  });
+}
+function bindPengawasMonitoring(){
+  const sel = document.getElementById('pw_ujian');
+  if(!sel) return; // tidak ada ujian ditugaskan, tidak ada yang perlu di-bind
+  sel.onchange = (e)=>{ pengawasSelectedUjian = e.target.value; renderPengawas(); };
+  refreshPengawasMonitor();
+  if(pengawasMonitorPoll) clearInterval(pengawasMonitorPoll);
+  pengawasMonitorPoll = setInterval(refreshPengawasMonitor, 4000);
 }
 
 // --- Hasil Ujian ---
