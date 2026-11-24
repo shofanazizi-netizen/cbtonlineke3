@@ -104,7 +104,7 @@ input[type="file"]::file-selector-button{background:var(--black);color:#fff;bord
 input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 /* Modal popup custom (pengganti confirm()/prompt() bawaan browser) */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
-.modal-box{background:var(--white);border:4px solid var(--black);box-shadow:var(--shadow-2);max-width:420px;width:100%;padding:28px;}
+.modal-box{background:var(--white);border:4px solid var(--black);box-shadow:var(--shadow-2);max-width:420px;width:100%;padding:28px;max-height:calc(100vh - 40px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .modal-box h3{font-size:18px;text-transform:uppercase;font-weight:900;margin-bottom:14px;border-bottom:3px solid var(--yellow);display:inline-block;padding-bottom:4px;}
 .modal-box p{font-size:14px;font-weight:600;margin-bottom:18px;line-height:1.5;}
 .modal-box input{width:100%;padding:11px 12px;border:3px solid var(--black);font-size:14px;margin-bottom:18px;}
@@ -152,10 +152,10 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 <div id="printSeatCards"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -993,6 +993,7 @@ function resetSoalGambarForm(){
   if(tu && td){ tu.classList.add('active'); td.classList.remove('active'); }
 }
 let buatUjianEditingId = null; // null = form buat ujian baru; terisi = sedang kelola soal ujian ini
+let editingSoalId = null; // null = form sedang menambah soal baru; terisi = sedang mengedit soal dengan id ini
 
 function parseCSVLine(line){
   const result = []; let cur=''; let inQuotes=false;
@@ -1094,7 +1095,7 @@ async function renderBuatUjian(){
       <p style="font-size:12px;color:var(--muted);font-weight:700">Soal yang ditambah atau diimpor di sini otomatis langsung terpakai untuk ujian ini — tidak perlu dicentang/dipilih lagi.</p>
     </div>
     <div class="card">
-      <h3 style="margin-bottom:14px">Tambah Soal Manual</h3>
+      <h3 style="margin-bottom:14px" id="formSoalTitle">Tambah Soal Manual</h3>
       <div class="form-row"><label>Tipe Soal</label>
         <select id="sq_tipe">
           <option value="pg">Pilihan Ganda</option>
@@ -1118,6 +1119,7 @@ async function renderBuatUjian(){
       <div id="sq_dynamic"></div>
       <div class="form-row" style="max-width:150px"><label>Bobot Nilai</label><input id="sq_bobot" type="number" value="10"></div>
       <button class="btn" id="btnSimpanSoal">Tambahkan Soal Ini</button>
+      <button class="btn ghost" id="btnBatalEditSoal" style="display:none;margin-left:8px">Batal Edit</button>
     </div>
     <div class="card">
       <h3 style="margin-bottom:10px">Impor Soal dari File (CSV atau Excel)</h3>
@@ -1132,7 +1134,7 @@ async function renderBuatUjian(){
     </div>
     <div class="card"><h3 style="margin-bottom:10px">Soal di Ujian Ini (${soalList.length})</h3>
     <table><thead><tr><th>Tipe</th><th>Pertanyaan</th><th>Bobot</th><th>Aksi</th></tr></thead><tbody>
-      ${soalList.map(s=>`<tr><td><span class="badge gray">${labelTipe(s.tipe_soal)}</span></td><td>${s.pertanyaan}${s.data_soal && s.data_soal.gambar ? ' <span class="badge yellow">🖼 Ada Gambar</span>' : ''}</td><td>${s.bobot}</td><td><button class="btn small danger" data-delsoal="${s.id_soal}">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada soal, tambahkan lewat form di atas</td></tr>'}
+      ${soalList.map(s=>`<tr><td><span class="badge gray">${labelTipe(s.tipe_soal)}</span></td><td>${s.pertanyaan}${s.data_soal && s.data_soal.gambar ? ' <span class="badge yellow">🖼 Ada Gambar</span>' : ''}</td><td>${s.bobot}</td><td><button class="btn small ghost" data-editsoal="${s.id_soal}">Edit</button> <button class="btn small danger" data-delsoal="${s.id_soal}">Hapus</button></td></tr>`).join('') || '<tr><td colspan="4">Belum ada soal, tambahkan lewat form di atas</td></tr>'}
     </tbody></table></div>`;
   }
 
@@ -1179,7 +1181,7 @@ async function bindBuatUjian(){
     if(tipeSel){ tipeSel.value = soalFormType; tipeSel.onchange = (e)=>{ soalFormType = e.target.value; renderSoalDynamicForm(soalFormType); }; }
     document.getElementById('tabSoalGambarUpload').onclick = ()=>{ soalGambarPreview = {type:'upload', value:''}; document.getElementById('tabSoalGambarUpload').classList.add('active'); document.getElementById('tabSoalGambarDrive').classList.remove('active'); renderSoalGambarInputArea(); updateSoalGambarPreviewArea(); };
     document.getElementById('tabSoalGambarDrive').onclick = ()=>{ soalGambarPreview = {type:'drive', value:''}; document.getElementById('tabSoalGambarDrive').classList.add('active'); document.getElementById('tabSoalGambarUpload').classList.remove('active'); renderSoalGambarInputArea(); updateSoalGambarPreviewArea(); };
-    document.getElementById('btnKembaliDaftarUjian').onclick = ()=>{ buatUjianEditingId = null; renderGuru(); };
+    document.getElementById('btnKembaliDaftarUjian').onclick = ()=>{ buatUjianEditingId = null; editingSoalId = null; renderGuru(); };
     document.getElementById('btnSimpanSoal').onclick = async ()=>{
       const tipe = document.getElementById('sq_tipe').value;
       const pertanyaan = document.getElementById('sq_pertanyaan').value.trim();
@@ -1204,10 +1206,57 @@ async function bindBuatUjian(){
         kunci_jawaban = { pasangan };
       }
       if(soalGambarPreview.value){ data_soal.gambar = { type: soalGambarPreview.type, value: soalGambarPreview.value }; }
-      await callServer('saveSoal', { id_guru:STATE.user.id_guru, id_ujian:buatUjianEditingId, tipe_soal:tipe, pertanyaan, data_soal, kunci_jawaban, bobot });
+      const payload = { id_guru:STATE.user.id_guru, id_ujian:buatUjianEditingId, tipe_soal:tipe, pertanyaan, data_soal, kunci_jawaban, bobot };
+      const sedangEdit = !!editingSoalId;
+      if(sedangEdit) payload.id_soal = editingSoalId;
+      await callServer('saveSoal', payload);
       cacheInvalidate('soalByUjian:'+buatUjianEditingId);
-      toast('Soal ditambahkan ke ujian ini','success'); renderGuru();
+      editingSoalId = null;
+      toast(sedangEdit ? 'Perubahan soal berhasil disimpan' : 'Soal ditambahkan ke ujian ini','success');
+      renderGuru();
     };
+    document.getElementById('btnBatalEditSoal').onclick = ()=>{ editingSoalId = null; renderGuru(); };
+    document.querySelectorAll('[data-editsoal]').forEach(b=> b.onclick = async ()=>{
+      const soalList = await cachedCall('soalByUjian:'+buatUjianEditingId,'getSoalByUjian',[buatUjianEditingId]);
+      const s = soalList.find(x=>x.id_soal===b.dataset.editsoal);
+      if(!s) return;
+      editingSoalId = s.id_soal;
+      soalFormType = s.tipe_soal;
+      document.getElementById('sq_tipe').value = s.tipe_soal;
+      renderSoalDynamicForm(s.tipe_soal);
+      document.getElementById('sq_pertanyaan').value = s.pertanyaan;
+      document.getElementById('sq_bobot').value = s.bobot;
+      if(s.tipe_soal==='pg' || s.tipe_soal==='pg_kompleks'){
+        const opsi = s.data_soal.opsi || [];
+        const get = k => (opsi.find(o=>o.k===k)||{}).v || '';
+        document.getElementById('sq_a').value = get('a');
+        document.getElementById('sq_b').value = get('b');
+        document.getElementById('sq_c').value = get('c');
+        document.getElementById('sq_d').value = get('d');
+        if(s.tipe_soal==='pg') document.getElementById('sq_kunci').value = s.kunci_jawaban.benar;
+        else document.getElementById('sq_kunci').value = (s.kunci_jawaban.benar||[]).join(',');
+      } else if(s.tipe_soal==='benar_salah'){
+        document.getElementById('sq_kunci').value = s.kunci_jawaban.benar ? 'true' : 'false';
+      } else if(s.tipe_soal==='menjodohkan'){
+        const kiri = s.data_soal.kiri || [], kanan = s.data_soal.kanan || [];
+        document.getElementById('sq_kiri').value = kiri.map(k=>k.v).join('\n');
+        document.getElementById('sq_kanan').value = kanan.map(k=>k.v).join('\n');
+      }
+      if(s.data_soal && s.data_soal.gambar){
+        soalGambarPreview = { type: s.data_soal.gambar.type, value: s.data_soal.gambar.value };
+        const tu = document.getElementById('tabSoalGambarUpload'), td = document.getElementById('tabSoalGambarDrive');
+        if(soalGambarPreview.type==='drive'){ td.classList.add('active'); tu.classList.remove('active'); }
+        else { tu.classList.add('active'); td.classList.remove('active'); }
+        renderSoalGambarInputArea();
+        updateSoalGambarPreviewArea();
+      } else {
+        resetSoalGambarForm();
+      }
+      document.getElementById('formSoalTitle').textContent = 'Edit Soal';
+      document.getElementById('btnSimpanSoal').textContent = 'Simpan Perubahan Soal';
+      document.getElementById('btnBatalEditSoal').style.display = 'inline-block';
+      document.getElementById('formSoalTitle').scrollIntoView({behavior:'smooth', block:'start'});
+    });
     document.querySelectorAll('[data-delsoal]').forEach(b=> b.onclick = async ()=>{
       const ok = await showConfirmModal({ title:'Hapus Soal', message:'Hapus soal ini dari ujian?', confirmLabel:'Ya, Hapus', danger:true });
       if(ok){ await callServer('deleteSoal', b.dataset.delsoal); cacheInvalidate('soalByUjian:'+buatUjianEditingId); renderGuru(); }
