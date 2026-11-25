@@ -152,10 +152,10 @@ input[type="file"]::file-selector-button:hover{background:var(--magenta);}
 <div id="printSeatCards"></div>
 <script type="module">
 // ====================== KONFIGURASI APLIKASI ======================
-const IS_PREVIEW = false; // UBAH KE false SAAT DEPLOY KE PRODUKSI
+const IS_PREVIEW = true; // UBAH KE false SAAT DEPLOY KE PRODUKSI
 // WAJIB DIISI jika frontend ini dihost terpisah (Vercel/GitHub Pages dll), BUKAN lewat URL Apps Script langsung.
 // Ambil dari: Apps Script editor -> Deploy -> Manage deployments -> URL yang berakhiran /exec
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxD2CgwDJbDysSLr71G-mJn9gyjpNuoi6--cmgY0Z6zKL5NJm-zAPRgHiN-s9J-mC2jIQ/exec";
+const APPS_SCRIPT_URL = "PASTE_URL_WEB_APP_APPS_SCRIPT_ANDA_DI_SINI";
 
 // ====================== PWA SETUP (Manifest + Service Worker) ======================
 const manifest = {
@@ -180,7 +180,8 @@ let PREVIEW_DB = {
     nama_lembaga:'MTs Negeri 1 Contoh', alamat_lembaga:'Jl. Pendidikan No. 17, Kota Contoh', kepala_madrasah:'Drs. H. Ahmad Fauzi, M.Pd.', nama_guru_mapel:'Budi Santoso, S.Pd.', logo_type:'', logo_value:''}],
   siswa: [
     {id_siswa:'s1', nama:'Ani Lestari', kelas:'9A'},
-    {id_siswa:'s2', nama:'Rudi Hartono', kelas:'9A'}
+    {id_siswa:'s2', nama:'Rudi Hartono', kelas:'9A'},
+    {id_siswa:'s3', nama:'Ani Lestari', kelas:'9B'}
   ],
   kelas: [ {id_kelas:'k1', nama_kelas:'9A'}, {id_kelas:'k2', nama_kelas:'9B'} ],
   pengawas: [ {id_pengawas:'p1', nama:'Siti Nurhaliza, S.Pd.', username:'siti', password:'pengawas123', status_aktif:true} ],
@@ -288,13 +289,16 @@ const PreviewAPI = {
     if(t.status_dipakai) return {success:false, message:'Token sudah digunakan'};
     const ujian = PREVIEW_DB.ujian.find(x=>x.id_ujian===t.id_ujian);
     if(!ujian) return {success:false, message:'Ujian tidak ditemukan'};
+    const namaDicari = String(nama||'').trim().toLowerCase();
+    const siswaMatch = PREVIEW_DB.siswa.find(s=>String(s.nama).trim().toLowerCase()===namaDicari);
+    if(!siswaMatch) return {success:false, message:'Nama tidak ditemukan di data siswa. Periksa kembali penulisan nama Anda (gunakan saran yang muncul saat mengetik), atau hubungi guru/admin jika belum terdaftar.'};
     t.status_dipakai = true;
-    const id_siswa = uid('s');
-    PREVIEW_DB.siswa.push({id_siswa, nama, kelas:ujian.kelas});
+    const id_siswa = siswaMatch.id_siswa;
+    const namaAsli = siswaMatch.nama;
     const soalList = PREVIEW_DB.bankSoal.filter(s=>s.id_ujian===ujian.id_ujian)
       .map(s=>({id_soal:s.id_soal, tipe_soal:s.tipe_soal, pertanyaan:s.pertanyaan, data_soal:s.data_soal, bobot:s.bobot}));
     const id_hasil = uid('h');
-    PREVIEW_DB.hasilUjian.push({id_hasil, id_ujian:ujian.id_ujian, id_siswa, nama_siswa:nama, token_dipakai:token,
+    PREVIEW_DB.hasilUjian.push({id_hasil, id_ujian:ujian.id_ujian, id_siswa, nama_siswa:namaAsli, token_dipakai:token,
       jawaban_json:{}, nilai:null, waktu_mulai:nowISO(), waktu_selesai:null, status:'dikerjakan', jumlah_pelanggaran:0, log_pelanggaran:[]});
     const guruPemilik = PREVIEW_DB.guru.find(g=>g.id_guru===ujian.id_guru) || {};
     const identitas = { nama_lembaga:guruPemilik.nama_lembaga||'', kepala_madrasah:guruPemilik.kepala_madrasah||'', nama_guru_mapel:guruPemilik.nama_guru_mapel||'', logo_type:guruPemilik.logo_type||'', logo_value:guruPemilik.logo_value||'' };
@@ -532,28 +536,66 @@ function renderLogin(){
   } else {
     wrap.innerHTML = `
       <div class="form-row"><label>Nomor Token Ujian</label><input id="ltoken" placeholder="Masukkan token dari guru" style="text-transform:uppercase"></div>
-      <div class="form-row"><label>Nama Lengkap</label><input id="lnama" list="daftarNamaSiswa" autocomplete="off" placeholder="Nama sesuai absen"></div>
-      <datalist id="daftarNamaSiswa"></datalist>
+      <div class="form-row" style="position:relative">
+        <label>Nama Lengkap</label>
+        <input id="lnama" autocomplete="off" placeholder="Ketik nama sesuai absen">
+        <div id="namaSuggestBox" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;background:#fff;border:3px solid var(--black);border-top:none;max-height:220px;overflow-y:auto;"></div>
+      </div>
       <button class="btn" style="width:100%" id="btnLoginSiswa">Mulai Ujian</button>`;
     document.getElementById('btnLoginSiswa').onclick = async ()=>{
       const token = document.getElementById('ltoken').value.trim().toUpperCase();
       const nama = document.getElementById('lnama').value.trim();
       if(!token || !nama){ document.getElementById('errBox').innerHTML = `<div class="error-msg">Token dan nama wajib diisi</div>`; return; }
+      // Validasi ketat sebelum kirim ke server: nama harus cocok persis (tanpa memandang besar/kecil huruf)
+      // dengan salah satu nama di data siswa yang sudah dimuat untuk autocomplete.
+      const namaDicari = nama.toLowerCase();
+      const cocok = (window.__daftarSiswaCache||[]).some(s => String(s.nama).trim().toLowerCase() === namaDicari);
+      if(!cocok){
+        document.getElementById('errBox').innerHTML = `<div class="error-msg">Nama tidak ditemukan di data siswa. Pilih dari saran yang muncul saat mengetik, atau hubungi guru/admin kalau nama Anda belum terdaftar.</div>`;
+        return;
+      }
       const res = await callServer('loginSiswaToken', token, nama);
       if(!res.success){ document.getElementById('errBox').innerHTML = `<div class="error-msg">${res.message}</div>`; return; }
       STATE.role='siswa'; STATE.user={nama};
       startExamSession(res.data);
     };
-    loadSiswaAutocomplete();
+    setupSiswaNamaAutocomplete();
   }
 }
-async function loadSiswaAutocomplete(){
+
+async function setupSiswaNamaAutocomplete(){
+  const input = document.getElementById('lnama');
+  const box = document.getElementById('namaSuggestBox');
+  if(!input || !box) return;
   try{
-    const list = await callServer('getSiswaList');
-    const namaUnik = [...new Set(list.map(s=>s.nama))].sort();
-    const dl = document.getElementById('daftarNamaSiswa');
-    if(dl) dl.innerHTML = namaUnik.map(n=>`<option value="${n}">`).join('');
-  }catch(e){ /* diam saja jika gagal, input tetap bisa dipakai manual */ }
+    window.__daftarSiswaCache = await callServer('getSiswaList');
+  }catch(e){ window.__daftarSiswaCache = []; }
+
+  function renderSuggestions(){
+    const q = input.value.trim().toLowerCase();
+    if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+    const list = window.__daftarSiswaCache || [];
+    // Hitung nama mana saja yang kembar (muncul di lebih dari satu kelas) untuk ditampilkan keterangan kelasnya
+    const jumlahPerNama = {};
+    list.forEach(s=>{ const k = String(s.nama).trim().toLowerCase(); jumlahPerNama[k] = (jumlahPerNama[k]||0) + 1; });
+    const cocok = list.filter(s => String(s.nama).toLowerCase().includes(q)).slice(0, 8);
+    if(cocok.length===0){ box.innerHTML = `<div style="padding:10px 12px;font-size:12px;font-weight:700;color:var(--muted)">Tidak ada nama cocok</div>`; box.style.display='block'; return; }
+    box.innerHTML = cocok.map(s=>{
+      const kembar = jumlahPerNama[String(s.nama).trim().toLowerCase()] > 1;
+      return `<div class="suggest-item" data-nama="${s.nama}" style="padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;border-bottom:2px solid var(--black)">
+        ${s.nama}${kembar ? ` <span style="font-weight:900;color:var(--muted);font-size:11px;text-transform:uppercase">— Kelas ${s.kelas}</span>` : ''}
+      </div>`;
+    }).join('');
+    box.style.display = 'block';
+    box.querySelectorAll('.suggest-item').forEach(el=>{
+      el.onmouseenter = ()=>{ el.style.background = 'var(--yellow)'; };
+      el.onmouseleave = ()=>{ el.style.background = '#fff'; };
+      el.onclick = ()=>{ input.value = el.dataset.nama; box.style.display='none'; };
+    });
+  }
+  input.addEventListener('input', renderSuggestions);
+  input.addEventListener('focus', renderSuggestions);
+  document.addEventListener('click', (e)=>{ if(e.target!==input && !box.contains(e.target)) box.style.display='none'; });
 }
 
 function logout(){
